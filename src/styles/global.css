@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
+  --color-bg: oklch(15% 0.005 250);
+  --color-surface: oklch(19% 0.006 250);
+  --color-surface-hatch: oklch(21% 0.006 250);
+  --color-surface-hatch-dark: oklch(18% 0.005 250);
+
+  --color-fg: oklch(94% 0.012 95);
+  --color-fg-strong: oklch(96% 0.012 95);
+  --color-muted: oklch(65% 0.015 250);
+  --color-subtle: oklch(50% 0.015 250);
+  --color-faint: oklch(45% 0.015 250);
+
+  --color-border: oklch(26% 0.006 250);
+  --color-border-strong: oklch(30% 0.006 250);
+
+  --color-accent: oklch(78% 0.15 55);
+  --color-accent-hover: oklch(85% 0.16 55);
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: oklch(78% 0.15 55 / 0.3);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+.hatch-bg {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-surface-hatch) 0px,
+    var(--color-surface-hatch) 2px,
+    var(--color-surface-hatch-dark) 2px,
+    var(--color-surface-hatch-dark) 16px
+  );
+}
+
+.prose-article :where(p) {
+  margin: 0 0 18px;
+  font-size: 17px;
+  line-height: 1.8;
+  color: oklch(80% 0.014 95);
+}
+
+.prose-article :where(h2) {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-fg-strong);
+  margin-top: 44px;
+  margin-bottom: 18px;
+  scroll-margin-top: 96px;
+}
+
+.prose-article :where(h3) {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-fg-strong);
+  margin-top: 32px;
+  margin-bottom: 14px;
+  scroll-margin-top: 96px;
+}
+
+.prose-article :where(strong) {
+  color: var(--color-fg-strong);
+  font-weight: 600;
+}
+
+.prose-article :where(pre) {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+  border: 1px solid var(--color-border-strong);
+  margin: 0 0 28px;
+}
+
+.prose-article :where(code):not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: oklch(88% 0.014 95);
+  background: var(--color-surface);
+  padding: 0.15em 0.4em;
+  border-radius: 2px;
+}
+
+.prose-article :where(ul, ol) {
+  margin: 0 0 18px;
+  padding-left: 1.3em;
+  font-size: 17px;
+  line-height: 1.8;
+  color: oklch(80% 0.014 95);
+}
+
+.prose-article :where(ul) {
+  list-style: disc;
+}
+
+.prose-article :where(ol) {
+  list-style: decimal;
+}
+
+.prose-article :where(li) {
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.prose-article :where(li)::marker {
+  color: var(--color-accent);
+}
+
+.prose-article :where(li > ul, li > ol) {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.prose-article :where(blockquote) {
+  margin: 28px 0;
+  padding: 2px 0 2px 20px;
+  border-left: 2px solid var(--color-accent);
+  font-size: 17px;
+  line-height: 1.8;
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.prose-article :where(blockquote p) {
+  margin: 0;
+  color: inherit;
+}
+
+.prose-article :where(table) {
+  display: block;
+  width: 100%;
+  max-width: fit-content;
+  overflow-x: auto;
+  margin: 28px 0;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.prose-article :where(th, td) {
+  border: 1px solid var(--color-border);
+  padding: 10px 16px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.prose-article :where(th) {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  background: var(--color-surface);
+}
+
+.prose-article :where(td) {
+  color: oklch(80% 0.014 95);
+}
+
+.prose-article :where(tbody tr:nth-child(even) td) {
+  background: oklch(19% 0.006 250 / 0.4);
+}

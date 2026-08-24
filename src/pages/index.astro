@@ -1,0 +1,42 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FeaturedArticle from '../components/FeaturedArticle.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import CategoryFilter from '../components/CategoryFilter.astro';
+
+const SINGLE_ARTICLE_MODE = true;
+if (SINGLE_ARTICLE_MODE) {
+  return Astro.redirect('/blog/certificados-gratuitos-vs-pago');
+}
+
+const allPosts = (await getCollection('blog')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+
+const featured = allPosts.find((post) => post.data.featured);
+const gridPosts = allPosts.filter((post) => post.id !== featured?.id);
+---
+
+<BaseLayout
+  title="Inicio"
+  description="Criptografía, protocolos web y casos reales: desmontamos supuestos sobre TLS, PKI y el resto de la pila web con rigor técnico."
+>
+  <main class="mx-auto max-w-[1180px] px-8 pt-14">
+    <p class="mb-2 font-mono text-[13px] tracking-[0.02em] text-subtle">
+      criptografía · protocolos web · casos reales
+    </p>
+    <h1 class="mb-12 max-w-[640px] font-mono text-[15px] leading-[1.6] font-medium text-muted">
+      Desmontamos supuestos sobre TLS, PKI y el resto de la pila web con un rigor técnico medio:
+      sin fórmulas, sin humo.
+    </h1>
+
+    {featured && <FeaturedArticle entry={featured} />}
+
+    <CategoryFilter />
+
+    <div id="article-grid" class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+      {gridPosts.map((post) => <ArticleCard entry={post} />)}
+    </div>
+  </main>
+</BaseLayout>

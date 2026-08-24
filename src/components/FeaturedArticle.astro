@@ -1,0 +1,35 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { CATEGORIES } from '../lib/categories';
+import { formatDate, formatReadTime } from '../lib/format';
+
+interface Props {
+  entry: CollectionEntry<'blog'>;
+}
+
+const { entry } = Astro.props;
+const { title, excerpt, category, date, readTime } = entry.data;
+const categoryLabel = CATEGORIES[category].label;
+---
+
+<a
+  href={`/blog/${entry.id}`}
+  class="mb-14 grid grid-cols-1 gap-8 border-b border-border pb-14 text-inherit no-underline md:mb-14 md:grid-cols-[1.1fr_0.9fr] md:items-center md:gap-12"
+>
+  <div>
+    <span class="mb-4 inline-flex items-center gap-1.5 font-mono text-[11.5px] font-semibold tracking-[0.06em] text-accent uppercase">
+      <span class="inline-block h-1.5 w-1.5 bg-accent"></span>
+      destacado · {categoryLabel}
+    </span>
+    <span class="mb-4 block font-mono text-[36px] leading-[1.15] font-semibold tracking-[-0.01em] text-fg-strong">
+      {title}
+    </span>
+    <p class="mb-5 max-w-[520px] text-[16.5px] leading-[1.7] text-muted">{excerpt}</p>
+    <div class="flex items-center gap-4 font-mono text-[12.5px] text-subtle">
+      <span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime)}</span>
+    </div>
+  </div>
+  <div class="hatch-bg flex aspect-[4/3] items-center justify-center border border-border">
+    <span class="font-mono text-xs text-subtle">// fig — cadena de confianza x.509</span>
+  </div>
+</a>

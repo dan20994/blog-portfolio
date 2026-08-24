@@ -1,0 +1,36 @@
+---
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+}
+
+const { headings } = Astro.props;
+const items = headings.filter((h) => h.depth === 2);
+---
+
+{
+  items.length > 0 && (
+    <aside class="hidden w-[190px] shrink-0 lg:block">
+      <div class="sticky top-24">
+        <p class="mb-3.5 font-mono text-[11px] tracking-[0.08em] text-subtle uppercase">
+          en este artículo
+        </p>
+        <nav class="flex flex-col gap-2.5">
+          {items.map((item) => (
+            <a
+              href={`#${item.slug}`}
+              class="font-mono text-[13px] leading-[1.4] text-muted no-underline"
+            >
+              {item.text}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </aside>
+  )
+}

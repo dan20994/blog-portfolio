@@ -1,0 +1,64 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+import RelatedArticles from '../../components/RelatedArticles.astro';
+import { CATEGORIES } from '../../lib/categories';
+import { formatDate, formatReadTime } from '../../lib/format';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { title, excerpt, category, date, readTime } = post.data;
+const { Content, headings } = await render(post);
+const categoryLabel = CATEGORIES[category].label;
+
+const related = (await getCollection('blog'))
+  .filter((p) => p.id !== post.id && p.data.category === category)
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+
+const SINGLE_ARTICLE_MODE = true;
+---
+
+<BaseLayout title={title} description={excerpt} hideChrome={SINGLE_ARTICLE_MODE}>
+  {
+    !SINGLE_ARTICLE_MODE && (
+      <div class="mx-auto max-w-[1180px] px-8 pt-3">
+        <a href="/" class="mt-7 inline-block font-mono text-[12.5px] text-subtle no-underline">
+          &larr; artículos
+        </a>
+      </div>
+    )
+  }
+
+  <div class={`mx-auto flex max-w-[1180px] justify-center gap-16 px-8 ${SINGLE_ARTICLE_MODE ? 'pt-16' : 'pt-6'}`}>
+    <TableOfContents headings={headings} />
+
+    <article class="min-w-0 max-w-[700px] flex-1 pb-16">
+      <span class="mb-5 inline-flex items-center gap-1.5 font-mono text-[11.5px] font-semibold tracking-[0.06em] text-accent uppercase">
+        <span class="inline-block h-1.5 w-1.5 bg-accent"></span>
+        {categoryLabel}
+      </span>
+      <h1 class="mb-5 font-mono text-[40px] leading-[1.2] font-semibold tracking-[-0.015em] text-fg-strong">
+        {title}
+      </h1>
+      <p class="mb-7 text-lg leading-[1.6] text-muted">{excerpt}</p>
+      <div class="mb-10 flex items-center gap-3.5 border-b border-border pb-7 font-mono text-[12.5px] text-subtle">
+        <span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime, true)}</span>
+      </div>
+
+      <div class="prose-article">
+        <Content />
+      </div>
+    </article>
+  </div>
+
+  <RelatedArticles entries={related} />
+</BaseLayout>

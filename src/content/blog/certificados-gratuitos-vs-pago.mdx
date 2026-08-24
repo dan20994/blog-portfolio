@@ -1,0 +1,183 @@
+---
+title: '¿Es menos seguro un certificado gratuito? Lo que dice la norma'
+excerpt: 'Validación, criptografía y precio son tres ejes independientes, pero solemos tratarlos como uno solo. Un recorrido por la anatomía de un certificado X.509 y por los Baseline Requirements para responder de una vez a la pregunta.'
+category: mitos
+date: 2026-08-24
+readTime: 12
+featured: true
+---
+
+import CertificateViewer from '../../components/CertificateViewer.astro';
+
+## Introducción
+
+Cuando se habla de certificados y criptografía en general, aparecen dudas, miedo y malos entendidos. Existe una opinión extendida —y ya lo adelanto: incorrecta— de que un cert gratuito es, en esencia, menos seguro y por tanto menos recomendable para producción. Quizás el error está en aplicar una vieja lógica: si es más caro, tiene que ser mejor. Por esto, intentaré arrojar un poco de luz sobre el tema y responder a la pregunta: ¿es un certificado gratuito menos seguro que uno de pago?
+
+Adelanto también el mapa. Este artículo separa tres cosas que solemos mezclar en una sola: **qué verificó la CA** sobre quien solicitó el certificado, **qué criptografía** protege la conexión, y **cuánto costó** el certificado. Son tres ejes independientes. El mito nace de tratarlos como si fueran uno.
+
+## 2. Qué es un certificado
+
+Para llegar al centro de esta cuestión hay que entender qué es un certificado y qué papel juega en la comunicación entre el navegador y el servidor que aloja el recurso al que quieres acceder.
+
+### 2.1 La definición y el problema que resuelve
+
+Empecemos por lo esencial:
+
+> Un certificado es una afirmación firmada por un tercero de confianza que vincula una clave pública con un identificador.
+
+Siendo más específicos: un certificado es un documento estructurado que contiene una clave pública, un identificador —en la web, uno o más nombres de dominio—, un período de validez y un conjunto de restricciones de uso. Todo ese contenido está firmado por una Autoridad de Certificación (CA), que con esa firma afirma haber verificado que quien posee la clave privada correspondiente controla ese identificador.
+
+El certificado no contiene la clave privada y no es información secreta: cualquiera puede obtenerlo conectándose al servidor, y de hecho todos los certificados públicamente confiables se publican en logs de Certificate Transparency que cualquier persona puede consultar. Su valor no está en ocultar nada, sino en que un tercero en quien el cliente ya confía respalda la vinculación.
+
+Ahora bien, ¿qué problema resuelve exactamente?
+
+Cuando tu navegador se conecta a `example.com`, negocia un canal cifrado con quien esté al otro extremo de la conexión. El cifrado por sí solo garantiza que nadie más pueda leer el tráfico, pero no garantiza con quién estás hablando. Un atacante que intercepte la conexión puede negociar contigo un canal perfectamente cifrado y leerlo todo, porque el cifrado es con él.
+
+El certificado resuelve exactamente ese hueco. El servidor demuestra que posee la clave privada asociada al certificado firmando parte del intercambio. El cliente comprueba entonces, entre otras cosas, que esa firma sea válida, que el nombre de dominio al que se conectó aparezca en el certificado, y que la cadena de firmas llegue hasta una CA presente en su almacén de confianza.
+
+Conviene ser preciso sobre qué garantiza eso, porque en ello se juega buena parte de este artículo: lo que queda autenticado es el nombre de dominio. Que estás hablando con quien controla example.com y no con un intermediario. Lo que el certificado afirme, si es que afirma algo, sobre qué organización hay detrás de ese nombre es una cuestión distinta —y depende del tipo de certificado, como veremos enseguida.
+
+Subrayemos algo que suele pasar desapercibido. Las claves que cifran el tráfico se generan de forma efímera en cada conexión mediante ECDHE (*Elliptic Curve Diffie-Hellman Ephemeral*) y se destruyen al cerrarla. El certificado no participa en ese cifrado: transporta una clave pública cuya contraparte privada el servidor usa para **firmar**, y así probar su identidad. Nada más.
+
+### 2.2 Clasificación de los certificados
+
+Los certificados se clasifican según el tipo de validación, es decir, según lo que la CA comprueba sobre el solicitante antes de emitir. Las categorías vigentes son:
+
+1. DV — Validación de dominio
+2. OV — Validación de organización
+3. IV — Validación individual (poco común en certificados de servidor)
+4. EV — Validación extendida
+
+El navegador no repite esas comprobaciones: confía en ellas por transitividad, porque ya confía en la CA que las realizó.
+
+Y aquí conviene fijarse en qué es exactamente lo que el navegador está confiando: que la CA verificó lo que su política dice verificar. Nada más. Cuánto abarca ese "lo que dice verificar" es precisamente lo que separa a DV de OV y EV.
+
+En el siguiente recurso interactivo podrás analizar la anatomía real de un certificado X.509 —uno emitido por Let's Encrypt para su sitio de pruebas—. Fíjate especialmente en el campo `Certificate Policies`.
+
+<CertificateViewer />
+
+Ese `2.23.140.1.2.1` es todo. En este certificado no hay ningún otro campo que indique su tipo de validación: el `Subject` está literalmente vacío. Un certificado OV o EV sí llevaría ahí datos de la organización —nombre legal, localidad, y en EV incluso la jurisdicción de incorporación—, pero esa información es un registro de lo que la CA comprobó, no un componente criptográfico. Volveremos sobre esta distinción, porque es donde el mito se sostiene.
+
+## 3. Quién emite qué: ejemplos reales
+
+Ahora veamos ejemplos prácticos de Autoridades de Certificación, qué tipos de validación emiten y bajo qué modelo.
+
+| CA | Tipos que emite | Modelo | Automatización (ACME) |
+|---|---|---|---|
+| Let's Encrypt (ISRG) | DV | Gratuito | Sí — creó el estándar |
+| Google Trust Services | DV | Gratuito | Sí |
+| ZeroSSL | DV, OV, EV | Gratuito y de pago | Sí |
+| DigiCert | DV, OV, EV | De pago | Sí |
+| Sectigo | DV, OV, EV | De pago | Sí |
+| GlobalSign | DV, OV, EV | De pago | Sí |
+
+Fíjate en la segunda columna: **las tres CAs comerciales emiten DV igual que Let's Encrypt**. Si un certificado DV fuera intrínsecamente menos seguro, no lo venderían — y sin embargo es, con diferencia, el tipo más usado.
+
+Esto ya nos dice algo importante. Las cuestiones "gratis contra de pago" y "DV contra OV/EV" no son lo mismo, aunque se solapen.
+
+En la práctica, la oferta gratuita de certificados TLS públicos es DV. No es casualidad ni generosidad limitada: DV es el único tipo de validación que puede completarse de extremo a extremo sin ningún paso humano previo. Comprobar que controlas un dominio es una operación mecánica —un archivo en una ruta conocida, un registro TXT en el DNS— que una máquina verifica en segundos. El coste marginal por certificado es prácticamente cero, y por eso puede regalarse a escala, a cualquiera, sin conocerlo de antes.
+
+OV y EV también pueden automatizarse en buena medida —varias CAs comerciales ofrecen ACME para ellos—, pero solo después de una verificación de identidad inicial que sí requiere intervención humana: revisar registros mercantiles, confirmar la existencia legal de la entidad, realizar comprobaciones telefónicas independientes. Ese trabajo cuesta dinero cada vez que hay una organización nueva que validar, y no se abarata con el volumen. Es la razón económica por la que nadie regala OV ni EV.
+
+Pero lo inverso no se cumple: **lo de pago no es todo OV o EV**. Las CAs comerciales venden enormes cantidades de certificados DV, con exactamente el mismo nivel de verificación que uno gratuito.
+
+Cuando pagas por un OV o un EV, pagas por un trabajo de verificación de identidad que alguien hizo a mano. Cuando pagas por un **DV**, no estás pagando por más verificación —es idéntica— sino por otras cosas: soporte con acuerdos de nivel de servicio, paneles de gestión centralizada para inventarios grandes, garantías contractuales, o el hecho de que la CA se ocupe del ciclo de renovación en entornos donde automatizarlo por tu cuenta no es viable.
+
+Ese último caso merece atención, y lo veremos en detalle más adelante: hay escenarios reales —típicamente cuando no tienes control programático sobre tu DNS— donde la automatización deja de ser trivial y delegar la gestión en un tercero tiene sentido. Pero conviene notar desde ya que ninguna de esas razones es criptográfica.
+
+### 3.1 Todas cumplen la misma norma
+
+Ninguna de estas CAs opera bajo reglas propias. Todas están sujetas a los **Baseline Requirements** del CA/Browser Forum, el documento que define qué debe cumplir un certificado para ser públicamente confiable: tamaños mínimos de clave, algoritmos de firma permitidos, métodos válidos de validación de dominio, plazos de revocación y requisitos de auditoría. Y además de esa base común, cada CA debe cumplir las políticas de los programas raíz en los que participa —Mozilla, Chrome, Apple, Microsoft—, que imponen requisitos propios por encima del mínimo.
+
+Let's Encrypt lo declara explícitamente en su CP/CPS:
+
+> La PKI de ISRG se conforma a la versión actual de los Baseline Requirements publicados en cabforum.org. En caso de cualquier inconsistencia entre este documento y esos Requirements, esos Requirements tienen precedencia.
+
+Y no es solo una declaración de intenciones. ISRG publica en su repositorio público las auditorías **WebTrust** independientes que acreditan ese cumplimiento — las mismas auditorías que deben pasar DigiCert, Sectigo o GlobalSign para permanecer en los almacenes de confianza de los navegadores.
+
+Lo importante aquí es que ese cumplimiento no admite grados en el producto. Una CA que incumple no emite "certificados de peor calidad": se expone a medidas de los programas raíz que pueden ir desde exigir un plan de remediación hasta dejar de confiar en sus certificados por completo. No existe una categoría de certificado públicamente confiable pero de segunda clase.
+
+## 4. Desmontando el mito
+
+Como vimos, la diferencia entre un DV, un OV y un EV está en el OID del campo `Certificate Policies` y en la información de organización que estos últimos incorporan al `Subject`. Es decir: en el registro de lo que la CA verificó. No en las propiedades criptográficas del certificado.
+
+Y como el precio es un eje independiente del tipo de validación, entre un DV gratuito y un DV de pago ni siquiera existe esa diferencia: son el mismo objeto.
+
+Ahora bien: toda CA que pretenda que sus certificados se usen en la práctica y estén presentes en los trust stores de navegadores y dispositivos debe cumplir los **Baseline Requirements** del CA/Browser Forum. Entre otras muchas cosas, esa norma define exactamente qué algoritmos y tamaños de clave son admisibles:
+
+- **RSA** — módulo de al menos 2048 bits, con firmas RSASSA-PKCS1-v1_5 o RSASSA-PSS sobre SHA-256, SHA-384 o SHA-512.
+- **ECDSA** — sobre las curvas NIST P-256, P-384 o P-521, con SHA-256, SHA-384 o SHA-512 respectivamente.
+- En la versión vigente de la norma, ningún otro algoritmo de clave pública ni tamaño de clave está permitido.
+
+### 4.1 Lo que no dice la norma
+
+Y ahora lo importante. Busca en esos requisitos una sola cláusula que empiece por "para certificados EV" o "para certificados de validación de dominio". No existe.
+
+Los Baseline Requirements definen los parámetros criptográficos admisibles y no los segmentan por tipo de validación en ningún punto. Un DV, un OV y un EV están sujetos exactamente a los mismos límites. Y aunque los certificados EV tienen además un documento propio —las *EV Guidelines*, que añaden requisitos por encima de los Baseline Requirements—, esos requisitos adicionales son de verificación de identidad y de operación de la CA. **Ninguno exige criptografía más fuerte.**
+
+Ese es el punto. La parte de la norma que sí distingue entre tipos de validación es la que describe qué debe verificar la CA sobre el solicitante antes de firmar. El tipo de validación determina qué comprobó la CA sobre tu identidad, no cuán fuerte es la criptografía que protege la conexión.
+
+Conviene también deshacer un malentendido derivado. Es cierto que verás certificados con parámetros distintos —uno con RSA-4096, otro con ECDSA P-256— pero esa variación no la produce el nivel de validación: la produce quien generó la solicitud. La clave la generas tú en tu propio servidor y le envías a la CA únicamente la parte pública, dentro de una solicitud de firma. La CA no elige tu clave: firma la que le mandas, siempre que cumpla los requisitos anteriores. Puedes pedirle a Let's Encrypt un certificado DV con RSA-4096 y lo obtendrás.
+
+### 4.2 El cumplimiento no es voluntario
+
+Podría objetarse que una cosa es lo que dice la norma y otra lo que las CAs hacen en la práctica. Es razonable, pero pasa por alto cómo funciona el modelo de confianza.
+
+Las CAs no cumplen los Baseline Requirements por buena voluntad, sino porque el incumplimiento se paga en la única moneda que les importa: la permanencia en los programas raíz. El proceso es gradual —informes públicos de incidente, planes de remediación, restricciones sobre qué pueden emitir— pero el extremo del recorrido es que los navegadores dejen de confiar en sus certificados. Y cuando eso ocurre, esos certificados no valen menos: no valen nada.
+
+Y conviene fijarse en quiénes han recorrido ese camino. No fueron CAs gratuitas. Fueron Symantec —en su momento una de las autoridades más grandes del mundo, cuyo negocio de certificados acabó vendido a DigiCert tras el proceso de desconfianza— y Entrust, otra CA comercial de gama alta, desconfiada por Chrome en 2024 tras un patrón documentado de fallos de cumplimiento y de respuestas inadecuadas a incidentes.
+
+Pagar más nunca fue garantía de cumplir mejor.
+
+### 4.3 Los navegadores ya retiraron la barra verde
+
+Durante años, los certificados EV mostraban el nombre de la empresa en verde junto a la barra de direcciones. Ese indicador era el principal argumento de venta de los certificados caros y la fuente más directa del mito: si un certificado hacía aparecer algo que otro no, tenía que ser mejor.
+
+Ese indicador ya no existe. Chrome lo trasladó al panel de información del sitio en 2019 y Firefox hizo lo mismo poco después. La razón que dieron ambos equipos: la interfaz de EV no protegía a los usuarios como se pretendía. Un experimento a gran escala eliminó la indicación de EV para un subconjunto aleatorio de usuarios y **ninguna métrica de comportamiento cambió**. Los estudios previos apuntaban en la misma dirección: los usuarios no advierten la ausencia de indicadores positivos de seguridad y ni siquiera comprenden con claridad qué significa el candado.
+
+A eso se sumó que la propia verificación de identidad demostró ser frágil. En 2017, un investigador constituyó legalmente una empresa llamada "Stripe, Inc" en Kentucky —distinta del procesador de pagos, incorporado en Delaware— y obtuvo un certificado EV legítimamente emitido a ese nombre. El coste total rondó los 180 dólares. La barra verde habría mostrado "Stripe, Inc" a cualquier visitante.
+
+El resultado es que hoy el navegador presenta exactamente la misma interfaz para un DV gratuito y para un EV de varios cientos de dólares al año. La diferencia visual que justificaba el precio fue retirada por quienes la mostraban, después de medir que aportaba poco o ningún valor de seguridad real.
+
+### 4.4 Entonces, ¿cuándo conviene pagar?
+
+La respuesta corta es: mucho menos de lo que se cree, y nunca por motivos criptográficos.
+
+Los certificados gratuitos se emiten con validez corta —90 días en Let's Encrypt, con perfiles opcionales de apenas seis días— y eso solo es sostenible con automatización. El protocolo ACME, estandarizado por el IETF, la resuelve: un cliente instalado en tu servidor renueva sin intervención humana. Para un certificado de dominio simple, esto funciona de forma trivial.
+
+El punto de fricción real aparece con los certificados wildcard. Su validación exige publicar un registro en tu DNS, de modo que automatizar la renovación requiere que tu proveedor de DNS ofrezca una api que lo permita. Si tu DNS está en un proveedor sin ella, o lo gestiona un tercero que no te da acceso, esa automatización deja de ser trivial y renovar cada 90 días a mano no es viable en producción.
+
+Ese es el escenario donde un certificado de pago se defiende: no porque el certificado sea mejor, sino porque compras menos eventos de renovación y asistencia humana cuando toca. Junto a él, hay otros casos legítimos:
+
+- **Cumplimiento normativo** que exija explícitamente validación de organización o extendida.
+- **Soporte con acuerdos de nivel de servicio** y garantías contractuales, si tu organización los necesita por contrato o por gestión de riesgo.
+- **Gestión centralizada** de inventarios grandes de certificados repartidos entre varios equipos.
+- **Usos fuera de la web pública**: firma de código, correo seguro o certificados con requisitos legales específicos. Ahí las CAs gratuitas sencillamente no compiten.
+
+Conviene notar que la primera de estas razones tiene fecha de caducidad, y que el reloj ya está corriendo. El CA/Browser Forum aprobó en 2025 una reducción escalonada de la validez máxima: desde el 15 de marzo de 2026 el límite es de 200 días, bajará a 100 días en marzo de 2027 y a 47 días en marzo de 2029. Comprar validez larga para no automatizar dejó de ser una estrategia viable a medio plazo.
+
+Y no es solo la duración. La propia norma está retirando de forma programada los métodos de validación que dependen de intervención humana —los basados en correo electrónico y en llamada telefónica tienen fechas de eliminación fijadas—, dejando en pie los que funcionan de máquina a máquina: HTTP, DNS, TLS-ALPN y los desafíos de ACME. La industria no está premiando la automatización: la está imponiendo. Y ese es exactamente el terreno donde nacieron las CAs gratuitas.
+
+## 5. Conclusión
+
+Un certificado gratuito no es menos seguro que uno de pago. No lo es porque validación, criptografía y precio son tres cosas independientes, y confundirlas es el origen de todo el malentendido.
+
+Todas las CAs públicamente confiables —gratuitas y comerciales— cumplen los mismos Baseline Requirements, con los mismos algoritmos y tamaños de clave permitidos, verificados mediante las mismas auditorías independientes. La norma no contiene una sola cláusula que ate un requisito criptográfico al tipo de validación, y los requisitos adicionales que sí existen para EV son de verificación de identidad, no de criptografía.
+
+El tipo de validación determina qué comprobó la CA sobre tu identidad, no cómo se cifra la conexión. Y el certificado ni siquiera cifra: solo transporta una clave pública que sirve para firmar y probar identidad. El cifrado lo produce un intercambio de claves efímero que ocurre igual con un certificado gratuito que con el más caro del mercado.
+
+La única señal visible que alguna vez distinguió a un certificado caro fue retirada por los propios navegadores, después de medir que no cambiaba el comportamiento de nadie.
+
+Quedan razones legítimas para pagar por un certificado: cumplimiento normativo, soporte contractual, gestión a escala, usos fuera de la web pública. Son razones operativas y de negocio, y son perfectamente válidas. Pero ninguna de ellas es "el cifrado es más fuerte", porque no lo es.
+
+## Referencias
+ 
+1. Cooper, D. et al. (2008). *Internet X.509 Public Key Infrastructure Certificate and CRL Profile*. RFC 5280, IETF. [rfc-editor.org/rfc/rfc5280](https://www.rfc-editor.org/rfc/rfc5280)
+2. Rescorla, E. (2018). *The Transport Layer Security (TLS) Protocol Version 1.3*. RFC 8446, IETF. [rfc-editor.org/rfc/rfc8446](https://www.rfc-editor.org/rfc/rfc8446)
+3. CA/Browser Forum. *Baseline Requirements for the Issuance and Management of Publicly-Trusted TLS Server Certificates*. [cabforum.org/.../baseline-requirements](https://cabforum.org/working-groups/server/baseline-requirements/requirements/)
+4. CA/Browser Forum. *Guidelines for the Issuance and Management of Extended Validation Certificates*. [cabforum.org/.../extended-validation](https://cabforum.org/working-groups/server/extended-validation/guidelines/)
+5. CA/Browser Forum (2025). *Ballot SC-081v3: Introduce Schedule of Reducing Validity and Data Reuse Periods*. [cabforum.org/2025/04/11/ballot-sc081v3](https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/)
+6. Internet Security Research Group. *Policy and Legal Repository* (CP/CPS y auditorías WebTrust). [letsencrypt.org/repository](https://letsencrypt.org/repository/)
+7. The Chromium Projects. *EV UI Moving to Page Info*. [chromium.googlesource.com/.../ev-to-page-info.md](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/security/ev-to-page-info.md)
+8. Thompson, C. et al. (2019). *The Web's Identity Crisis: Understanding the Effectiveness of Website Identity Indicators*. 28th USENIX Security Symposium.
+9. Carroll, I. (2017). *Extended Validation Is Broken*.

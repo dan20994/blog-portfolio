@@ -1,0 +1,61 @@
+---
+import { CATEGORY_FILTERS } from '../lib/categories';
+---
+
+<div id="category-filter" class="mb-10 flex flex-wrap gap-2.5">
+  {
+    CATEGORY_FILTERS.map((cat, i) => (
+      <button
+        type="button"
+        data-filter={cat.id}
+        data-hue={cat.hue}
+        aria-pressed={i === 0 ? 'true' : 'false'}
+        class="chip cursor-pointer border px-3.5 py-1.5 font-mono text-[12.5px] font-medium tracking-[-0.01em] select-none"
+      >
+        {cat.label}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  const container = document.getElementById('category-filter');
+  const chips = Array.from(container?.querySelectorAll<HTMLButtonElement>('.chip') ?? []);
+
+  const inactiveColor = 'oklch(68% 0.02 250)';
+  const inactiveBorder = 'oklch(32% 0.006 250)';
+
+  function colorFor(hue: string | null) {
+    return hue ? `oklch(78% 0.15 ${hue})` : 'oklch(95% 0.012 95)';
+  }
+
+  function paint(chip: HTMLButtonElement) {
+    const isActive = chip.getAttribute('aria-pressed') === 'true';
+    const hue = chip.dataset.hue || null;
+    const color = colorFor(hue);
+    chip.style.color = isActive ? color : inactiveColor;
+    chip.style.borderColor = isActive ? color : inactiveBorder;
+    chip.style.background = isActive
+      ? hue
+        ? `oklch(78% 0.15 ${hue} / 0.12)`
+        : 'oklch(95% 0.012 95 / 0.08)'
+      : 'transparent';
+  }
+
+  function applyFilter(filterId: string) {
+    document.querySelectorAll<HTMLElement>('[data-category]').forEach((card) => {
+      const match = filterId === 'todos' || card.dataset.category === filterId;
+      card.style.display = match ? '' : 'none';
+    });
+  }
+
+  chips.forEach((chip) => {
+    paint(chip);
+    chip.addEventListener('click', () => {
+      chips.forEach((c) => c.setAttribute('aria-pressed', 'false'));
+      chip.setAttribute('aria-pressed', 'true');
+      chips.forEach(paint);
+      applyFilter(chip.dataset.filter ?? 'todos');
+    });
+  });
+</script>

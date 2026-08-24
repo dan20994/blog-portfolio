@@ -1,0 +1,366 @@
+---
+interface CertField {
+  id: string;
+  title: string;
+  paragraphs: string[];
+  table?: { oid: string; type: string }[];
+}
+
+const FIELDS: CertField[] = [
+  {
+    id: 'policies',
+    title: 'X509v3 Certificate Policies — el más importante',
+    paragraphs: [
+      'El OID 2.23.140.1.2.1 identifica la política de validación de dominio del CA/Browser Forum. Es el único campo de este certificado que indica su tipo de validación.',
+      'Los requisitos criptográficos de los Baseline Requirements no dependen de este valor: son idénticos para los cuatro.',
+    ],
+    table: [
+      { oid: '2.23.140.1.2.1', type: 'DV' },
+      { oid: '2.23.140.1.2.2', type: 'OV' },
+      { oid: '2.23.140.1.2.3', type: 'IV' },
+      { oid: '2.23.140.1.1', type: 'EV' },
+    ],
+  },
+  {
+    id: 'key-usage',
+    title: 'X509v3 Key Usage',
+    paragraphs: [
+      'Solo Digital Signature. No aparece keyEncipherment porque una clave ECDSA no puede cifrar nada: solo firmar.',
+      'Esta clave pública es criptográficamente incapaz de cifrar el tráfico. El cifrado del canal lo produce un intercambio de claves efímero (ECDHE) durante el handshake; el certificado solo interviene para probar identidad.',
+    ],
+  },
+  {
+    id: 'subject',
+    title: 'Subject (vacío)',
+    paragraphs: [
+      'No contiene nada. El nombre de dominio ya no puede ir en el commonName, y un certificado DV no incorpora información de organización.',
+      'Un certificado OV o EV sí llevaría aquí el nombre legal de la empresa, su localidad y, en EV, su jurisdicción de incorporación. Esa información es el registro de lo que la CA verificó, no un componente criptográfico.',
+    ],
+  },
+  {
+    id: 'validity',
+    title: 'Validity',
+    paragraphs: [
+      "Del 19 al 26 de febrero de 2025: 160 horas, poco más de seis días. Es el perfil de vida corta de Let's Encrypt.",
+      'La validez corta reduce la ventana de exposición si una clave privada se compromete, y solo es sostenible con renovación automatizada. Los Baseline Requirements van en esa dirección para toda la industria: 200 días de máximo desde marzo de 2026, 100 desde marzo de 2027 y 47 desde marzo de 2029.',
+    ],
+  },
+  {
+    id: 'san',
+    title: 'Subject Alternative Name',
+    paragraphs: [
+      'El único lugar donde vive la identidad del certificado. Los navegadores solo miran aquí; el commonName se ignora desde hace años.',
+      'Está marcado como crítico porque el Subject está vacío: cuando eso ocurre, la norma obliga a que el SAN sea crítico. Es el campo que el cliente compara con el dominio al que se conectó.',
+    ],
+  },
+];
+
+function fieldButton(id: string, label: string) {
+  return `<button type="button" class="cert-field" data-field="${id}">${label}</button>`;
+}
+
+const CERT_RAW = `Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            03:b0:b0:15:c1:a4:e2:64:16:11:73:1a:71:1b:71:1d:e0:ef
+        Signature Algorithm: ecdsa-with-SHA384
+        Issuer: C=US, O=Let's Encrypt, CN=E6
+        Validity
+            Not Before: Feb 19 17:30:01 2025 GMT
+            Not After : Feb 26 09:30:00 2025 GMT
+        Subject:
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                pub:
+                    04:28:48:8b:6d:d9:5d:5a:a1:c2:39:77:1a:ca:47:
+                    c8:8b:7e:69:b4:2a:25:6f:3a:18:b0:28:1c:b3:bb:
+                    69:0b:78:2e:c2:d0:17:5f:02:0b:70:74:80:9d:92:
+                    e1:21:01:7a:24:85:72:ea:e8:33:59:66:09:a1:e5:
+                    3e:1f:95:5c:19
+                ASN1 OID: prime256v1
+                NIST CURVE: P-256
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature
+            X509v3 Extended Key Usage:
+                TLS Web Server Authentication
+            X509v3 Basic Constraints: critical
+                CA:FALSE
+            X509v3 Authority Key Identifier:
+                93:27:46:98:03:A9:51:68:8E:98:D6:C4:42:48:DB:23:BF:58:94:D2
+            Authority Information Access:
+                OCSP - URI:http://e6.o.lencr.org
+                CA Issuers - URI:http://e6.i.lencr.org/
+            X509v3 Subject Alternative Name: critical
+                DNS:helloworld.letsencrypt.org
+            X509v3 Certificate Policies:
+                Policy: 2.23.140.1.2.1
+            CT Precertificate SCTs:
+                Signed Certificate Timestamp:
+                    Version   : v1 (0x0)
+                    Log ID    : CC:FB:0F:6A:85:71:09:65:FE:95:9B:53:CE:E9:B2:7C:
+                                22:E9:85:5C:0D:97:8D:B6:A9:7E:54:C0:FE:4C:0D:B0
+                    Timestamp : Feb 19 18:28:32.078 2025 GMT
+                    Extensions: none
+                    Signature : ecdsa-with-SHA256
+                                30:45:02:20:53:5D:E7:54:DF:48:D8:89:AC:EF:B6:F7:
+                                8B:78:F4:2E:40:35:CE:28:0B:B8:13:53:37:FB:C6:79:
+                                4D:96:12:AC:02:21:00:C2:2E:61:7E:20:BD:4A:C2:8B:
+                                C6:54:D0:D2:C7:2D:53:18:4B:99:D6:21:E3:4A:FA:10:
+                                25:90:4B:FC:96:C3:60
+                Signed Certificate Timestamp:
+                    Version   : v1 (0x0)
+                    Log ID    : E0:92:B3:FC:0C:1D:C8:E7:68:36:1F:DE:61:B9:96:4D:
+                                0A:52:78:19:8A:72:D6:72:C4:B0:4D:A5:6D:6F:54:04
+                    Timestamp : Feb 19 18:28:32.147 2025 GMT
+                    Extensions: none
+                    Signature : ecdsa-with-SHA256
+                                30:46:02:21:00:AC:D8:DB:99:21:42:25:A0:E6:87:D6:
+                                DF:5E:5C:32:9B:F1:B8:E8:58:44:81:3E:C2:B8:8B:60:
+                                71:32:F1:08:B3:02:21:00:E3:0D:69:03:72:AF:56:24:
+                                CE:B7:0D:53:3D:79:A8:65:74:A1:52:E0:E4:12:4D:FA:
+                                29:16:C5:73:9D:71:11:C5
+    Signature Algorithm: ecdsa-with-SHA384
+    Signature Value:
+        30:65:02:30:30:0d:ab:2e:c6:d3:d0:08:c3:35:dc:77:b4:8d:
+        97:bb:85:c2:10:be:c6:57:dd:ba:fa:75:3d:e1:03:1d:cf:c5:
+        03:d2:b7:99:16:24:19:7b:8a:b7:33:5d:3a:1e:f0:70:02:31:
+        00:b8:c4:30:39:81:42:2c:17:6c:1e:38:ee:81:a4:69:90:1e:
+        d2:ba:b1:03:71:2d:35:5e:70:8f:4a:1b:78:e6:e5:ba:3f:cd:
+        81:4b:15:10:6f:4e:aa:20:48:a2:08:05:47`;
+
+const certHtml = CERT_RAW.replace('Validity\n', `${fieldButton('validity', 'Validity')}\n`)
+  .replace('Subject:', `${fieldButton('subject', 'Subject')}:`)
+  .replace('X509v3 Key Usage:', `${fieldButton('key-usage', 'X509v3 Key Usage')}:`)
+  .replace(
+    'X509v3 Subject Alternative Name:',
+    `${fieldButton('san', 'X509v3 Subject Alternative Name')}:`,
+  )
+  .replace(
+    'X509v3 Certificate Policies:',
+    `${fieldButton('policies', 'X509v3 Certificate Policies')}:`,
+  );
+---
+
+<details class="cert-details">
+  <summary>
+    <span class="chevron">▸</span>
+    <span class="label">ver certificado de ejemplo</span>
+    <span class="hint">helloworld.letsencrypt.org</span>
+  </summary>
+  <p class="cert-hint">Haz clic en los campos resaltados para ver qué significan.</p>
+  <pre class="cert-pre" set:html={certHtml} />
+</details>
+
+<dialog id="cert-field-dialog" class="cert-dialog">
+  <button type="button" class="cert-dialog-close" aria-label="Cerrar" id="cert-dialog-close">
+    ×
+  </button>
+  <h4 id="cert-dialog-title"></h4>
+  <div id="cert-dialog-body"></div>
+</dialog>
+
+<script define:vars={{ fields: FIELDS }}>
+  const dialog = document.getElementById('cert-field-dialog');
+  const titleEl = document.getElementById('cert-dialog-title');
+  const bodyEl = document.getElementById('cert-dialog-body');
+  const closeBtn = document.getElementById('cert-dialog-close');
+
+  document.querySelectorAll('.cert-field').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const field = fields.find((f) => f.id === btn.dataset.field);
+      if (!field || !dialog || !titleEl || !bodyEl) return;
+
+      titleEl.textContent = field.title;
+      bodyEl.innerHTML = '';
+
+      field.paragraphs.forEach((text, i) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        bodyEl.appendChild(p);
+
+        if (i === 0 && field.table) {
+          const table = document.createElement('table');
+          table.innerHTML =
+            '<thead><tr><th>OID</th><th>Tipo</th></tr></thead><tbody>' +
+            field.table.map((row) => `<tr><td>${row.oid}</td><td>${row.type}</td></tr>`).join('') +
+            '</tbody>';
+          bodyEl.appendChild(table);
+        }
+      });
+
+      dialog.showModal();
+    });
+  });
+
+  closeBtn?.addEventListener('click', () => dialog?.close());
+
+  dialog?.addEventListener('click', (event) => {
+    const rect = dialog.getBoundingClientRect();
+    const inside =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+    if (!inside) dialog.close();
+  });
+</script>
+
+<style>
+  .cert-details {
+    margin: 28px 0;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+  }
+
+  .cert-details summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid transparent;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-subtle);
+    list-style: none;
+  }
+
+  .cert-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .cert-details[open] summary {
+    border-bottom-color: var(--color-border-strong);
+  }
+
+  .cert-details .chevron {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    color: var(--color-accent);
+  }
+
+  .cert-details[open] .chevron {
+    transform: rotate(90deg);
+  }
+
+  .cert-details summary .label {
+    color: var(--color-muted);
+  }
+
+  .cert-details summary .hint {
+    margin-left: auto;
+    color: var(--color-faint);
+  }
+
+  .cert-hint {
+    margin: 0;
+    padding: 12px 24px 0;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-faint);
+  }
+
+  .cert-pre {
+    margin: 0;
+    padding: 16px 24px 22px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: oklch(78% 0.014 95);
+    white-space: pre;
+  }
+
+  .cert-pre :global(.cert-field) {
+    all: unset;
+    cursor: pointer;
+    color: var(--color-accent);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
+
+  .cert-pre :global(.cert-field:hover),
+  .cert-pre :global(.cert-field:focus-visible) {
+    color: var(--color-accent-hover);
+    background: oklch(78% 0.15 55 / 0.12);
+  }
+
+  .cert-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    max-width: 520px;
+    width: calc(100vw - 48px);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    padding: 28px;
+  }
+
+  .cert-dialog::backdrop {
+    background: oklch(10% 0.005 250 / 0.7);
+    backdrop-filter: blur(4px);
+  }
+
+  .cert-dialog-close {
+    all: unset;
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 18px;
+    line-height: 1;
+    color: var(--color-subtle);
+  }
+
+  .cert-dialog-close:hover {
+    color: var(--color-fg);
+  }
+
+  #cert-dialog-title {
+    margin: 0 24px 14px 0;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+
+  #cert-dialog-body :global(p) {
+    margin: 0 0 14px;
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: oklch(82% 0.014 95);
+  }
+
+  #cert-dialog-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  #cert-dialog-body :global(table) {
+    width: 100%;
+    margin: 4px 0 18px;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+
+  #cert-dialog-body :global(th),
+  #cert-dialog-body :global(td) {
+    border: 1px solid var(--color-border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+
+  #cert-dialog-body :global(th) {
+    color: var(--color-subtle);
+    font-weight: 600;
+    background: var(--color-surface);
+  }
+</style>

@@ -1,0 +1,19 @@
+---
+interface Props {
+  myth: string;
+  reality: string;
+}
+
+const { myth, reality } = Astro.props;
+---
+
+<div class="not-prose my-11 bg-[oklch(20%_0.02_55_/_0.5)] px-7 py-6.5">
+  <p class="mb-2.5 font-mono text-[11px] font-semibold tracking-[0.08em] text-[oklch(70%_0.15_30)] uppercase">
+    mito
+  </p>
+  <p class="mb-5 text-[16px] leading-[1.65] text-[oklch(88%_0.014_95)]">{myth}</p>
+  <p class="mb-2.5 font-mono text-[11px] font-semibold tracking-[0.08em] text-[oklch(78%_0.15_140)] uppercase">
+    realidad
+  </p>
+  <p class="text-[16px] leading-[1.65] text-[oklch(88%_0.014_95)]">{reality}</p>
+</div>

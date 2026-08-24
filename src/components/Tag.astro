@@ -1,0 +1,21 @@
+---
+import { CATEGORIES, type CategoryId } from '../lib/categories';
+
+interface Props {
+  category: CategoryId;
+  dot?: boolean;
+  class?: string;
+}
+
+const { category, dot = false, class: className = '' } = Astro.props;
+const { label, hue } = CATEGORIES[category];
+const color = `oklch(78% 0.15 ${hue})`;
+---
+
+<span
+  class={`inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-[0.05em] uppercase ${className}`}
+  style={{ color }}
+>
+  {dot && <span class="inline-block h-1.5 w-1.5" style={{ background: color }} />}
+  {label}
+</span>
