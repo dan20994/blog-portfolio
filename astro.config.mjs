@@ -5,9 +5,17 @@ import tailwindcss from '@tailwindcss/vite';
 
 import mdx from '@astrojs/mdx';
 
+import vercel from '@astrojs/vercel';
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://protocolo-roto.example',
+
+  adapter: vercel(),
+
+  redirects: {
+    '/': '/blog/certificados-gratuitos-vs-pago',
+  },
 
   vite: {
     plugins: [tailwindcss()]

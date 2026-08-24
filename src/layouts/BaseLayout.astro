@@ -3,6 +3,7 @@ import { Font } from 'astro:assets';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
+import Analytics from '@vercel/analytics/astro'
 
 interface Props {
   title: string;
@@ -24,7 +25,8 @@ const { title, description, hideChrome = false } = Astro.props;
     <meta name="description" content={description} />
     <Font cssVariable="--font-sans" preload />
     <Font cssVariable="--font-mono" preload />
-    <title>{title} · protocolo_roto</title>
+    <title>{title} cybersec </title>
+    <Analytics />
   </head>
   <body class="min-h-screen font-sans">
     {!hideChrome && <Header />}

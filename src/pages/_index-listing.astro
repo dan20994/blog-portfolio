@@ -5,11 +5,6 @@ import FeaturedArticle from '../components/FeaturedArticle.astro';
 import ArticleCard from '../components/ArticleCard.astro';
 import CategoryFilter from '../components/CategoryFilter.astro';
 
-const SINGLE_ARTICLE_MODE = true;
-if (SINGLE_ARTICLE_MODE) {
-  return Astro.redirect('/blog/certificados-gratuitos-vs-pago');
-}
-
 const allPosts = (await getCollection('blog')).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
 );
