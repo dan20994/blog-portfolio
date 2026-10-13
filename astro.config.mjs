@@ -9,9 +9,14 @@ import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://protocolo-roto.example',
+  site: 'https://blog-cybersec.vercel.app',
 
   adapter: vercel(),
+
+  // CSS como ficheros externos: los <style> inline de componentes no reciben hash CSP
+  build: {
+    inlineStylesheets: 'never',
+  },
 
   redirects: {
     '/': '/blog/certificados-gratuitos-vs-pago',
@@ -22,6 +27,20 @@ export default defineConfig({
   },
 
   integrations: [mdx()],
+
+  security: {
+    csp: {
+      directives: [
+        "default-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ],
+    },
+  },
 
   fonts: [
     {

@@ -154,7 +154,7 @@ const certHtml = CERT_RAW.replace('Validity\n', `${fieldButton('validity', 'Vali
   <pre class="cert-pre" set:html={certHtml} />
 </details>
 
-<dialog id="cert-field-dialog" class="cert-dialog">
+<dialog id="cert-field-dialog" class="cert-dialog" data-fields={JSON.stringify(FIELDS)}>
   <button type="button" class="cert-dialog-close" aria-label="Cerrar" id="cert-dialog-close">
     ×
   </button>
@@ -162,19 +162,27 @@ const certHtml = CERT_RAW.replace('Validity\n', `${fieldButton('validity', 'Vali
   <div id="cert-dialog-body"></div>
 </dialog>
 
-<script define:vars={{ fields: FIELDS }}>
-  const dialog = document.getElementById('cert-field-dialog');
+<script>
+  interface CertField {
+    id: string;
+    title: string;
+    paragraphs: string[];
+    table?: { oid: string; type: string }[];
+  }
+
+  const dialog = document.getElementById('cert-field-dialog') as HTMLDialogElement | null;
   const titleEl = document.getElementById('cert-dialog-title');
   const bodyEl = document.getElementById('cert-dialog-body');
   const closeBtn = document.getElementById('cert-dialog-close');
+  const fields: CertField[] = JSON.parse(dialog?.dataset.fields ?? '[]');
 
-  document.querySelectorAll('.cert-field').forEach((btn) => {
+  document.querySelectorAll<HTMLElement>('.cert-field').forEach((btn) => {
     btn.addEventListener('click', () => {
       const field = fields.find((f) => f.id === btn.dataset.field);
       if (!field || !dialog || !titleEl || !bodyEl) return;
 
       titleEl.textContent = field.title;
-      bodyEl.innerHTML = '';
+      bodyEl.replaceChildren();
 
       field.paragraphs.forEach((text, i) => {
         const p = document.createElement('p');
@@ -183,10 +191,18 @@ const certHtml = CERT_RAW.replace('Validity\n', `${fieldButton('validity', 'Vali
 
         if (i === 0 && field.table) {
           const table = document.createElement('table');
-          table.innerHTML =
-            '<thead><tr><th>OID</th><th>Tipo</th></tr></thead><tbody>' +
-            field.table.map((row) => `<tr><td>${row.oid}</td><td>${row.type}</td></tr>`).join('') +
-            '</tbody>';
+          const headRow = table.createTHead().insertRow();
+          ['OID', 'Tipo'].forEach((label) => {
+            const th = document.createElement('th');
+            th.textContent = label;
+            headRow.appendChild(th);
+          });
+          const tbody = table.createTBody();
+          field.table.forEach((row) => {
+            const tr = tbody.insertRow();
+            tr.insertCell().textContent = row.oid;
+            tr.insertCell().textContent = row.type;
+          });
           bodyEl.appendChild(table);
         }
       });

@@ -22,3 +22,11 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+.env.*
+!.env.example
+
+# vercel
+.vercel/
+
+# design prototypes (local only)
+design/
