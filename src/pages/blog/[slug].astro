@@ -15,7 +15,7 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props;
-const { title, excerpt, category, date, readTime } = post.data;
+const { title, excerpt, category, date, readTime, image, imageAlt } = post.data;
 const { Content, headings } = await render(post);
 const categoryLabel = CATEGORIES[category].label;
 
@@ -27,7 +27,15 @@ const related = (await getCollection('blog'))
 const SINGLE_ARTICLE_MODE = true;
 ---
 
-<BaseLayout title={title} description={excerpt} hideChrome={SINGLE_ARTICLE_MODE}>
+<BaseLayout
+  title={title}
+  description={excerpt}
+  image={image}
+  imageAlt={imageAlt}
+  type="article"
+  publishedTime={date}
+  hideChrome={SINGLE_ARTICLE_MODE}
+>
   {
     !SINGLE_ARTICLE_MODE && (
       <div class="mx-auto max-w-[1180px] px-8 pt-3">
