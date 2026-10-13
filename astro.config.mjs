@@ -28,6 +28,11 @@ export default defineConfig({
 
   integrations: [mdx()],
 
+  // Prism usa clases en vez de estilos inline (Shiki), compatible con la CSP
+  markdown: {
+    syntaxHighlight: 'prism',
+  },
+
   security: {
     csp: {
       directives: [

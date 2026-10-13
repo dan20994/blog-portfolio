@@ -92,6 +92,73 @@ a:hover {
   line-height: 1.75;
   border: 1px solid var(--color-border-strong);
   margin: 0 0 28px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  background: var(--color-surface);
+  color: oklch(84% 0.014 95);
+  tab-size: 2;
+}
+
+/* Tema Prism */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--color-faint);
+  font-style: italic;
+}
+
+.token.punctuation,
+.token.operator {
+  color: var(--color-muted);
+}
+
+.token.keyword,
+.token.atrule,
+.token.important,
+.token.selector {
+  color: var(--color-accent);
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.inserted {
+  color: oklch(80% 0.11 145);
+}
+
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol {
+  color: oklch(82% 0.12 85);
+}
+
+.token.function,
+.token.class-name,
+.token.builtin {
+  color: oklch(78% 0.09 230);
+}
+
+.token.tag,
+.token.property,
+.token.attr-name,
+.token.variable {
+  color: oklch(80% 0.08 300);
+}
+
+.token.deleted {
+  color: oklch(70% 0.16 25);
+}
+
+.token.important,
+.token.bold {
+  font-weight: 600;
+}
+
+.token.italic {
+  font-style: italic;
 }
 
 .prose-article :where(code):not(pre code) {
