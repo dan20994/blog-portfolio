@@ -1,4 +1,4 @@
-# protocolo_roto
+# Blog de ciberseguridad
 
 Blog sobre criptografía, protocolos web y ciberseguridad.
 

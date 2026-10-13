@@ -15,7 +15,7 @@ export async function getStaticPaths() {
 }
 
 const { post } = Astro.props;
-const { title, excerpt, category, date, readTime, image, imageAlt } = post.data;
+const { title, excerpt, category, date, readTime, image, imageAlt, author } = post.data;
 const { Content, headings } = await render(post);
 const categoryLabel = CATEGORIES[category].label;
 
@@ -32,6 +32,7 @@ const SINGLE_ARTICLE_MODE = true;
   description={excerpt}
   image={image}
   imageAlt={imageAlt}
+  author={author}
   type="article"
   publishedTime={date}
   hideChrome={SINGLE_ARTICLE_MODE}
@@ -59,7 +60,7 @@ const SINGLE_ARTICLE_MODE = true;
       </h1>
       <p class="mb-7 text-lg leading-[1.6] text-muted">{excerpt}</p>
       <div class="mb-10 flex items-center gap-3.5 border-b border-border pb-7 font-mono text-[12.5px] text-subtle">
-        <span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime, true)}</span>
+        <span>{author}</span><span>·</span><span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime, true)}</span>
       </div>
 
       {

@@ -12,6 +12,7 @@ const blog = defineCollection({
     date: z.coerce.date(),
     readTime: z.number(),
     featured: z.boolean().default(false),
+    author: z.string().default('Daniel Hernández'),
     image: z.string().startsWith('/').optional(),
     imageAlt: z.string().optional(),
   }),

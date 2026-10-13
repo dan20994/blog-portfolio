@@ -4,7 +4,7 @@ import { getCollection } from 'astro:content';
 export async function GET(context) {
   const posts = await getCollection('blog');
   return rss({
-    title: 'protocolo_roto',
+    title: 'Blog de ciberseguridad',
     description: 'Criptografía, protocolos web y casos reales.',
     site: context.site,
     items: posts.map((post) => ({
