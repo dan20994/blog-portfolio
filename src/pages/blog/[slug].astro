@@ -62,6 +62,21 @@ const SINGLE_ARTICLE_MODE = true;
         <span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime, true)}</span>
       </div>
 
+      {
+        image && (
+          <figure class="mb-12 overflow-hidden border border-border-strong">
+            <img
+              src={image}
+              alt={imageAlt ?? ''}
+              loading="eager"
+              fetchpriority="high"
+              decoding="async"
+              class="block aspect-[5/3] w-full object-cover object-center sm:aspect-[1733/907]"
+            />
+          </figure>
+        )
+      }
+
       <div class="prose-article">
         <Content />
       </div>
