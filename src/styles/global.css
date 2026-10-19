@@ -81,6 +81,11 @@ a:hover {
   scroll-margin-top: 96px;
 }
 
+/* URLs largas (p. ej. en Referencias) no deben desbordar en móvil */
+.prose-article :where(a) {
+  overflow-wrap: anywhere;
+}
+
 .prose-article :where(strong) {
   color: var(--color-fg-strong);
   font-weight: 600;

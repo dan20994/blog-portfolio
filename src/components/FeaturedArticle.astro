@@ -8,7 +8,7 @@ interface Props {
 }
 
 const { entry } = Astro.props;
-const { title, excerpt, category, date, readTime } = entry.data;
+const { title, excerpt, category, date, readTime, image, imageAlt } = entry.data;
 const categoryLabel = CATEGORIES[category].label;
 ---
 
@@ -29,7 +29,19 @@ const categoryLabel = CATEGORIES[category].label;
       <span>{formatDate(date)}</span><span>·</span><span>{formatReadTime(readTime)}</span>
     </div>
   </div>
-  <div class="hatch-bg flex aspect-[4/3] items-center justify-center border border-border">
-    <span class="font-mono text-xs text-subtle">// fig — cadena de confianza x.509</span>
-  </div>
+  {
+    image ? (
+      <img
+        src={image}
+        alt={imageAlt ?? ''}
+        loading="eager"
+        decoding="async"
+        class="block aspect-[1733/907] w-full border border-border object-cover object-center"
+      />
+    ) : (
+      <div class="hatch-bg flex aspect-[4/3] items-center justify-center border border-border">
+        <span class="font-mono text-xs text-subtle">// fig</span>
+      </div>
+    )
+  }
 </a>

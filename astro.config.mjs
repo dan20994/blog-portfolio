@@ -7,6 +7,8 @@ import mdx from '@astrojs/mdx';
 
 import vercel from '@astrojs/vercel';
 
+import react from '@astrojs/react';
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://blog-cybersec.vercel.app',
@@ -18,15 +20,11 @@ export default defineConfig({
     inlineStylesheets: 'never',
   },
 
-  redirects: {
-    '/': '/blog/certificados-gratuitos-vs-pago',
-  },
-
   vite: {
     plugins: [tailwindcss()]
   },
 
-  integrations: [mdx()],
+  integrations: [mdx(), react()],
 
   // Prism usa clases en vez de estilos inline (Shiki), compatible con la CSP
   markdown: {

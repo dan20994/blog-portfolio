@@ -1,0 +1,192 @@
+---
+// Tarjeta plegable para demos interactivas. La demo (React) no se descarga
+// hasta que el lector abre la tarjeta por primera vez.
+interface Props {
+  demo: 'totp-webauthn';
+  title: string;
+  description: string;
+}
+
+const { demo, title, description } = Astro.props;
+---
+
+<details class="demo-card" data-demo={demo}>
+  <summary>
+    <span class="chevron" aria-hidden="true">▸</span>
+    <span class="text">
+      <span class="eyebrow">demo interactiva</span>
+      <span class="title">{title}</span>
+      <span class="description">{description}</span>
+    </span>
+    <span class="action" aria-hidden="true"></span>
+  </summary>
+  <div class="demo-mount" aria-live="polite">
+    <p class="demo-status">Cargando demo…</p>
+  </div>
+</details>
+
+<script>
+  const loaders: Record<string, () => Promise<{ mount: (el: HTMLElement) => void }>> = {
+    'totp-webauthn': () => import('./demos/mountTotpWebauthnFlow.jsx'),
+  };
+
+  // En dev, @vitejs/plugin-react exige el preámbulo de Fast Refresh antes de evaluar
+  // cualquier componente. Astro solo lo inyecta en páginas con islas client:*, y aquí
+  // montamos React a mano, así que lo instalamos nosotros. En producción no existe.
+  async function installReactRefreshPreamble() {
+    const w = window as typeof window & Record<string, unknown>;
+    if (w.__vite_plugin_react_preamble_installed__) return;
+    const runtimeUrl = '/@react-refresh';
+    const { default: RefreshRuntime } = await import(/* @vite-ignore */ runtimeUrl);
+    RefreshRuntime.injectIntoGlobalHook(window);
+    w.$RefreshReg$ = () => {};
+    w.$RefreshSig$ = () => (type: unknown) => type;
+    w.__vite_plugin_react_preamble_installed__ = true;
+  }
+
+  document.querySelectorAll<HTMLDetailsElement>('details.demo-card').forEach((card) => {
+    let loaded = false;
+
+    card.addEventListener('toggle', async () => {
+      if (!card.open || loaded) return;
+      loaded = true;
+
+      const target = card.querySelector<HTMLElement>('.demo-mount');
+      const load = loaders[card.dataset.demo ?? ''];
+      if (!target || !load) return;
+
+      try {
+        if (import.meta.env.DEV) await installReactRefreshPreamble();
+        const { mount } = await load();
+        target.replaceChildren();
+        mount(target);
+      } catch (error) {
+        console.error('[DemoCard] No se pudo cargar la demo:', error);
+        loaded = false;
+        const status = target.querySelector('.demo-status');
+        if (status) status.textContent = 'No se pudo cargar la demo. Cierra y vuelve a abrir la tarjeta para reintentarlo.';
+      }
+    });
+  });
+</script>
+
+<style>
+  .demo-card {
+    margin: 32px 0;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+  }
+
+  .demo-card summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid transparent;
+    cursor: pointer;
+    list-style: none;
+    transition: background 0.15s ease;
+  }
+
+  .demo-card summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .demo-card summary:hover {
+    background: oklch(21% 0.006 250);
+  }
+
+  .demo-card summary:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+
+  .demo-card[open] summary {
+    border-bottom-color: var(--color-border-strong);
+  }
+
+  .chevron {
+    display: inline-block;
+    margin-top: 1px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-accent);
+    transition: transform 0.15s ease;
+  }
+
+  .demo-card[open] .chevron {
+    transform: rotate(90deg);
+  }
+
+  .text {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .title {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-fg-strong);
+  }
+
+  .description {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--color-muted);
+  }
+
+  .action {
+    flex: none;
+    align-self: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-subtle);
+  }
+
+  .action::before {
+    content: 'abrir';
+  }
+
+  .demo-card[open] .action::before {
+    content: 'cerrar';
+  }
+
+  .demo-status {
+    margin: 0;
+    padding: 24px 22px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--color-faint);
+  }
+
+  @media (max-width: 480px) {
+    .demo-card summary {
+      padding: 16px;
+    }
+
+    .action {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chevron,
+    .demo-card summary {
+      transition: none;
+    }
+  }
+</style>

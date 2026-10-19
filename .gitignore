@@ -30,3 +30,6 @@ pnpm-debug.log*
 
 # design prototypes (local only)
 design/
+
+#development docs
+docs/

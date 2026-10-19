@@ -1,0 +1,101 @@
+---
+title: 'Tener segundo factor no significa estar protegido'
+excerpt: 'La autenticación en dos pasos con códigos TOTP mejora mucho una contraseña sola, pero no frena el phishing. Qué cambia con WebAuthn y las passkeys, qué resuelve cada método y qué sigue dependiendo de ti como desarrollador.'
+category: auth
+date: 2026-10-18
+readTime: 8
+featured: true
+image: '/og/totp-and-webauthn.jpg'
+imageAlt: 'Ilustración: un móvil con un código TOTP y un portátil con passkey a ambos lados de un formulario de inicio de sesión'
+---
+
+import DemoCard from '../../components/DemoCard.astro';
+
+¿Te ha salido el aviso para crear una passkey y lo has saltado? Si es así, no eres el único. ¿Por qué todos lo están pidiendo?
+
+La realidad es que, aunque ya tengas activada la autenticación en dos pasos, puede que no sea suficiente para proteger tu cuenta. Por eso, toda la industria lleva años moviéndose hacia un sistema que permita asegurar el acceso de forma fiable.
+
+Si analizamos algunas estadísticas, podemos entender la gravedad del asunto. En un informe de abril de 2026, la empresa KELA contabilizó más de 2.800 millones de credenciales comprometidas solo en 2025. Con tantas credenciales en circulación, los atacantes no necesitan entrar por la fuerza: simplemente inician sesión. El Microsoft Digital Defense Report 2026 llega a una conclusión similar: la mayoría de las intrusiones siguen comenzando con una persona o una credencial, no con un exploit.
+
+Entonces surge la pregunta: ¿por qué los mecanismos más usados, que llevan años siendo los mismos, siguen dejando a los usuarios vulnerables?
+
+## 1. El problema de partida: por qué la contraseña sola no basta
+
+No es un secreto para nadie que los usuarios suelen reutilizar sus contraseñas en varios sitios, y ahí comienzan los problemas. Cada contraseña reutilizada es una llave que abre varias puertas a la vez: basta con que se filtre en uno de esos sitios para que un atacante pueda probarla en los demás y acceder a mucha más información.
+
+Otro problema grave es el phishing, y nos sorprendería saber lo común que es caer en él. El usuario recibe un enlace, llega a una página idéntica a la original y escribe su contraseña sin sospechar nada. En ese momento, la contraseña ya está comprometida.
+
+Añadir un segundo paso por SMS ayuda, pero tampoco es suficiente. Un atacante puede convencer a la operadora telefónica de transferir el número de la víctima a otra SIM, lo que se conoce como SIM swapping, y a partir de ahí recibe los códigos en su lugar. De hecho, el NIST, la institución estadounidense que publica las guías de referencia sobre autenticación, ya clasifica el SMS como un método “restringido”: se permite, pero la organización que lo usa debe asumir explícitamente sus riesgos.
+
+Así podríamos seguir con una larga lista de vulnerabilidades en los inicios de sesión que dependen únicamente de una contraseña, o de una contraseña con verificación por SMS.
+
+Pero si ya sabemos que lo habitual no es lo seguro, ¿qué opciones tenemos como desarrolladores para construir sistemas robustos y proteger el acceso a las cuentas de nuestros usuarios?
+
+## 2. Un secreto compartido frente a una firma
+
+Hoy en día hay dos opciones principales. Una es la autenticación en dos pasos con Time-based One-Time Password (TOTP), que combina un secreto con la hora. La otra es WebAuthn con passkeys, que puede funcionar tanto de segundo factor como de sustituto de la contraseña, y quedar como único mecanismo de inicio de sesión.
+
+### TOTP: un secreto compartido y un reloj
+
+Cuando activamos la autenticación en dos pasos con TOTP, el servidor genera un secreto y lo comparte con la app de autenticación, normalmente en forma de código QR. A partir de ese secreto combinado con la hora, la app calcula un código nuevo cada 30 segundos. Al iniciar sesión, el usuario lee el código actual en la app y lo teclea en la web. Entonces el servidor calcula el suyo por su cuenta y los compara. Si coinciden, concede el acceso a la cuenta.
+
+Si quieres una descripción más técnica y detallada del mecanismo, puedes consultar el [RFC 4226](https://www.rfc-editor.org/rfc/rfc4226) y el [RFC 6238](https://www.rfc-editor.org/rfc/rfc6238).
+
+### WebAuthn y passkeys: un par de llaves y una firma
+
+A diferencia del método anterior, esta vez es el dispositivo quien crea las llaves. Genera un par: una privada, que nunca se entrega al servidor, y una pública, que se registra en él. Según el tipo de passkey, la llave privada puede quedarse en un único dispositivo o sincronizarse de forma protegida entre los dispositivos del usuario.
+
+Al iniciar sesión, el servidor envía un desafío único al dispositivo, y este lo firma con la llave privada tras desbloquearse con huella, rostro o PIN. Además, cada credencial queda vinculada al sitio en el que se registró, identificado por su dominio (en la especificación, el RP ID). El navegador comprueba que la página que pide la prueba pertenezca a ese dominio, el dispositivo solo usa la llave registrada para él, y la respuesta incluye datos que permiten al servidor verificar desde dónde se hizo la petición.
+
+Si quieres una descripción más detallada de este proceso, puedes consultar la [especificación de WebAuthn del W3C](https://www.w3.org/TR/webauthn-3/) o, para una introducción más accesible, la [documentación de MDN](https://developer.mozilla.org/es/docs/Web/API/Web_Authentication_API).
+
+¿Y qué repercusión tiene el método que elijamos frente a ataques concretos contra la autenticación de nuestra web?
+
+## 3. ¿Qué soluciona cada uno y qué no?
+
+El equipo que diseña el software tiene la responsabilidad de proteger los datos, tanto de los usuarios como de la empresa. La autenticación es la primera línea de defensa, y por eso debemos prestarle especial atención.
+
+De entrada, tanto la autenticación en dos pasos con TOTP como WebAuthn con passkeys mejoran en gran medida la protección respecto a usar solo una contraseña. Aun así, debemos conocer las limitaciones de cada uno: qué solucionan y qué no logran resolver.
+
+En la siguiente tabla comparamos ambos métodos frente a las amenazas más habituales. “Protege” significa que el método por sí solo frena esa amenaza; “No protege”, que no la frena por mucho que lo implementemos bien; y “Depende”, que el resultado está en nuestras manos. La última columna indica qué podemos hacer como desarrolladores para reducir el riesgo en cada caso.
+
+| Amenaza | TOTP | WebAuthn / passkeys | Qué depende de ti |
+|---|---|---|---|
+| Contraseña reutilizada o filtrada | Protege | Protege | — |
+| Phishing | No protege | Protege | — |
+| Filtración de los datos de autenticación del servidor | Depende | Protege | Cifrar los secretos TOTP y guardar la clave de cifrado aparte |
+| Adivinar el código del segundo factor | Depende | Protege | Limitar intentos y rechazar códigos ya usados |
+| Pérdida o robo del dispositivo | Depende | Depende | Permitir revocar dispositivos y credenciales desde la cuenta |
+| Malware en el equipo del usuario | No protege | No protege | Sesiones cortas y alertas de inicios de sesión inusuales |
+
+Ten en cuenta que la tabla compara solo los métodos de autenticación. Ninguno de ellos protege por sí solo otras partes del sistema, como las sesiones activas o los procesos de recuperación.
+
+Hay un punto que ninguna de estas filas resuelve: la recuperación de la cuenta. Si recuperar el acceso es más fácil que iniciar sesión, por ejemplo con un simple correo, el atacante no necesitará romper el segundo factor; le bastará con saltárselo. Diseñar bien ese proceso no es sencillo, sobre todo con passkeys, y lo veremos con calma en la segunda parte.
+
+De todas las amenazas de la tabla, el phishing es la que más diferencia marca entre ambos métodos. Un código TOTP no sabe en qué dominio se está escribiendo: si el usuario lo teclea en una web falsa, sigue siendo válido durante unos segundos, tiempo suficiente para que el atacante lo use en la web real. Con WebAuthn, en cambio, la credencial está vinculada al dominio legítimo: en una web falsa el navegador ni siquiera la ofrece, y aunque se intentara retransmitir la respuesta, el servidor detectaría que no proviene de su dominio.
+
+Y no es un escenario teórico. En julio de 2025, usuarios de PyPI, el repositorio oficial de paquetes de Python, recibieron correos que los dirigían a pypj.org, un dominio casi idéntico al real, pypi.org. La web falsa hacía de intermediaria con la auténtica y reenviaba al instante lo que escribían las víctimas. Según el informe de PyPI, ese intermediario podía capturar tanto el código TOTP como las cookies de sesión. El informe no determina cuál de los dos se usó en cada caso, pero sí confirma que los atacantes accedieron a cuatro cuentas, generaron tokens de API y publicaron dos versiones maliciosas del paquete num2words. También deja claro que, si las víctimas hubieran usado WebAuthn, con una passkey o una llave de seguridad, el atacante no habría podido usar el segundo factor, porque la credencial no funciona fuera del dominio legítimo.
+
+Para entenderlo mejor, veámoslo paso a paso. En la siguiente demo puedes recorrer el mismo intento de phishing con TOTP y con WebAuthn, y ver en qué momento funciona en uno y por qué falla en el otro.
+
+<DemoCard
+  demo="totp-webauthn"
+  title="TOTP vs. WebAuthn, paso a paso"
+  description="Recorre paso a paso el mismo ataque con TOTP y con WebAuthn y mira en qué punto falla cada uno."
+/>
+
+## 4. La dirección está clara
+
+La próxima vez que te aparezca ese aviso para crear una passkey, ya sabrás qué hay detrás. No es una moda ni un capricho de las grandes empresas: es la respuesta a un problema que la autenticación en dos pasos con códigos no logra resolver.
+
+Como desarrolladores, nuestro camino es avanzar hacia mecanismos resistentes al phishing. Lo que no es tan evidente es cómo hacerlo en cada caso. ¿Puedo exigir passkeys a todos mis usuarios? ¿Qué requisitos tienen? ¿Cómo diseño la recuperación de una cuenta sin abrir una puerta trasera? ¿Puedo avanzar por etapas? De eso hablaremos en la segunda parte.
+
+## Referencias
+
+1. KELA (abril de 2026). *The State of Cybercrime 2026: Emerging Threats & Predictions*. [kelacyber.com/blog/the-state-of-cybercrime-2026](https://www.kelacyber.com/blog/the-state-of-cybercrime-2026/)
+2. Microsoft. *Microsoft Digital Defense Report 2026*. [microsoft.com/.../microsoft-digital-defense-report](https://www.microsoft.com/en-us/corporate-responsibility/topics/cybersecurity/reports/microsoft-digital-defense-report/)
+3. IETF. *HOTP: An HMAC-Based One-Time Password Algorithm*. RFC 4226. [rfc-editor.org/rfc/rfc4226](https://www.rfc-editor.org/rfc/rfc4226)
+4. IETF. *TOTP: Time-Based One-Time Password Algorithm*. RFC 6238. [rfc-editor.org/rfc/rfc6238](https://www.rfc-editor.org/rfc/rfc6238)
+5. W3C. *Web Authentication: An API for accessing Public Key Credentials, Level 3*. [w3.org/TR/webauthn-3](https://www.w3.org/TR/webauthn-3/)
+6. MDN Web Docs. *Web Authentication API*. [developer.mozilla.org/.../Web_Authentication_API](https://developer.mozilla.org/es/docs/Web/API/Web_Authentication_API)
+7. PyPI (31 de julio de 2025). *Incident Report: Phishing Attack*. [blog.pypi.org/posts/2025-07-31-incident-report-phishing-attack](https://blog.pypi.org/posts/2025-07-31-incident-report-phishing-attack/)
