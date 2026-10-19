@@ -62,11 +62,11 @@ En la siguiente tabla comparamos ambos métodos frente a las amenazas más habit
 | Amenaza | TOTP | WebAuthn / passkeys | Qué depende de ti |
 |---|---|---|---|
 | Contraseña reutilizada o filtrada | Protege | Protege | — |
-| Phishing | No protege | Protege | — |
+| Phishing | No protege | Protege | — |
 | Filtración de los datos de autenticación del servidor | Depende | Protege | Cifrar los secretos TOTP y guardar la clave de cifrado aparte |
 | Adivinar el código del segundo factor | Depende | Protege | Limitar intentos y rechazar códigos ya usados |
 | Pérdida o robo del dispositivo | Depende | Depende | Permitir revocar dispositivos y credenciales desde la cuenta |
-| Malware en el equipo del usuario | No protege | No protege | Sesiones cortas y alertas de inicios de sesión inusuales |
+| Malware en el equipo del usuario | No protege | No protege | Sesiones cortas y alertas de inicios de sesión inusuales |
 
 Ten en cuenta que la tabla compara solo los métodos de autenticación. Ninguno de ellos protege por sí solo otras partes del sistema, como las sesiones activas o los procesos de recuperación.
 

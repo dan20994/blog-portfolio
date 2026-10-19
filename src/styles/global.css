@@ -236,6 +236,10 @@ a:hover {
   padding: 10px 16px;
   text-align: left;
   vertical-align: top;
+}
+
+/* Las cabeceras en una línea; las celdas parten texto para que la tabla quepa */
+.prose-article :where(th) {
   white-space: nowrap;
 }
 
