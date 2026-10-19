@@ -26,14 +26,10 @@
 .twf button{ font:inherit; }
 .twf button:focus-visible{ outline:2px solid var(--color-accent); outline-offset:2px; }
 
-.twf-head{ display:flex; flex-direction:column; gap:6px; margin-bottom:18px; }
 .twf-eyebrow{ font-family:var(--twf-mono); font-size:11.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--twf-muted); }
-.twf-h{ font-family:var(--twf-mono); font-size:26px; font-weight:600; letter-spacing:-.015em; line-height:1.15; color:var(--twf-text); text-wrap:balance; border:0; }
-.twf-h-totp{ color:var(--twf-violet); }
-.twf-h-wa{ color:var(--twf-amber); }
-.twf-h-vs{ font-family:var(--twf-mono); font-weight:400; font-size:.7em; color:var(--twf-muted); }
-.twf-sub{ font-size:16.5px; color:var(--twf-text); }
-.twf-desc{ color:var(--twf-muted); max-width:62ch; }
+
+/* Cabecera: método (pestañas) a la izquierda y recorrido (conmutador) a la derecha */
+.twf-head{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
 
 .twf-tabs{ display:inline-flex; flex-wrap:wrap; gap:4px; padding:4px; border:1px solid var(--twf-line); border-radius:0; background:var(--twf-panel); }
 .twf-tab{ appearance:none; border:0; background:transparent; color:var(--twf-muted); font-size:14px; font-weight:500; padding:8px 14px; border-radius:0; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:color .2s, background .2s; }
@@ -42,12 +38,32 @@
 .twf-tab-dot{ width:8px; height:8px; border-radius:50%; background:var(--tone); opacity:.5; }
 .twf-tab[aria-selected="true"] .twf-tab-dot{ opacity:1; }
 
+/* Conmutador flujo legítimo / ataque */
+.twf-switch{ display:inline-flex; flex-wrap:wrap; gap:4px; padding:4px; border:1px solid var(--twf-line); border-radius:0; background:var(--twf-panel); }
+.twf-switch-btn{ appearance:none; border:0; background:transparent; color:var(--twf-muted); font-size:13px; font-weight:500; padding:7px 12px; border-radius:0; cursor:pointer; transition:color .2s, background .2s, box-shadow .2s; }
+.twf-switch-btn:hover{ color:var(--twf-text); }
+.twf-switch-btn[aria-pressed="true"]{ background:var(--twf-panel-2); color:var(--tone); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent); }
+
 .twf-stage{
   margin-top:14px; border:1px solid var(--twf-line-soft); border-radius:0; padding:16px 12px 12px;
   background-color:var(--twf-panel);
   background-image:radial-gradient(circle at 1px 1px, oklch(65% 0.015 250 / 0.13) 1px, transparent 0);
   background-size:18px 18px;
 }
+/* Controles dentro del escenario: botones de icono y, debajo, la fila de pasos */
+.twf-toolbar{ display:flex; flex-direction:column; gap:8px; width:max-content; margin-bottom:10px; }
+.twf-tools{ display:flex; gap:4px; }
+.twf-tool{ appearance:none; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; padding:0; color:var(--twf-text); background:var(--twf-panel-2); border:1px solid var(--twf-line); border-radius:0; cursor:pointer; transition:border-color .2s, background .2s; }
+.twf-tool:hover:not(:disabled){ border-color:var(--twf-amber); }
+.twf-tool:disabled{ opacity:.4; cursor:not-allowed; }
+.twf-tool.is-primary{ background:var(--twf-amber); border-color:var(--twf-amber); color:var(--color-bg); }
+.twf-tool.is-primary:hover:not(:disabled){ background:var(--color-accent-hover); border-color:var(--color-accent-hover); }
+.twf-steps{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px; }
+.twf-seg{ appearance:none; height:16px; padding:6px 0; border:0; border-radius:0; background:var(--twf-line); background-clip:content-box; cursor:pointer; transition:background-color .25s; }
+.twf-seg:hover{ background-color:var(--twf-muted); }
+.twf-seg.is-done{ background-color:color-mix(in srgb, var(--tone) 55%, transparent); }
+.twf-seg.is-current{ background-color:var(--tone); padding:5px 0; }
+
 .twf-svg{ display:block; width:100%; height:auto; margin:0 auto; overflow:visible; }
 .twf-svg.is-narrow{ max-width:420px; }
 
@@ -69,10 +85,18 @@
 .twf-edge.is-current line{ animation:twf-draw .55s ease-out both; }
 .twf-e-label{ font-family:var(--twf-sans); font-size:13px; font-weight:500; fill:var(--tone); paint-order:stroke; stroke:var(--twf-panel); stroke-width:4px; stroke-linejoin:round; animation:twf-fade .4s .2s both; }
 .twf-e-dot{ fill:var(--tone); }
+/* Flecha que no llega: tramo cortado y una X en el punto de bloqueo */
+.twf-edge.is-blocked line{ stroke:var(--tone); stroke-width:2; stroke-dasharray:5 5; }
+/* El trazado de twf-draw dejaría la línea continua: aquí basta con que aparezca. */
+.twf-edge.is-blocked.is-current line{ animation:twf-fade .4s ease-out both; }
+.twf-edge.is-blocked.is-future line{ stroke:var(--twf-dim); stroke-width:1.4; }
+.twf-edge.is-blocked.is-future, .twf-edge.is-blocked.is-past{ opacity:.5; }
+.twf-blocked-x line{ stroke:var(--twf-coral); stroke-width:2.2; stroke-dasharray:none; stroke-linecap:round; }
 .twf-m-blue path{ fill:var(--twf-blue); }
 .twf-m-violet path{ fill:var(--twf-violet); }
 .twf-m-amber path{ fill:var(--twf-amber); }
 .twf-m-green path{ fill:var(--twf-green); }
+.twf-m-coral path{ fill:var(--twf-coral); }
 .twf-m-past path{ fill:var(--twf-muted); }
 .twf-m-future path{ fill:var(--twf-dim); }
 .twf-fadein{ animation:twf-fade .45s ease-out both; }
@@ -95,21 +119,16 @@
 .twf-checks{ display:flex; flex-direction:column; gap:7px; }
 .twf-checks li{ display:flex; gap:8px; align-items:flex-start; font-size:14px; color:var(--twf-text-2); animation:twf-fade .35s ease-out both; }
 .twf-checks svg{ flex:none; margin-top:3px; color:var(--twf-green); }
+.twf-checks li.is-bad{ color:var(--twf-text); }
+.twf-checks li.is-bad svg{ color:var(--twf-coral); }
 .twf-result-row{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:2px; }
 .twf-result{ display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:14px; color:var(--twf-green); padding:6px 12px; border-radius:0; border:1px solid color-mix(in srgb, var(--twf-green) 40%, transparent); background:color-mix(in srgb, var(--twf-green) 10%, transparent); }
+.twf-result.is-bad{ color:var(--twf-coral); border-color:color-mix(in srgb, var(--twf-coral) 45%, transparent); background:color-mix(in srgb, var(--twf-coral) 10%, transparent); }
 
-.twf-controls{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; padding-top:16px; border-top:1px solid var(--twf-line-soft); }
-.twf-btns{ display:flex; flex-wrap:wrap; gap:8px; }
 .twf-btn{ appearance:none; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:500; line-height:1.2; color:var(--twf-text); background:var(--twf-panel-2); border:1px solid var(--twf-line); border-radius:0; padding:8px 12px; cursor:pointer; transition:border-color .2s, background .2s; }
 .twf-btn:hover:not(:disabled){ border-color:var(--twf-amber); }
 .twf-btn:disabled{ opacity:.4; cursor:not-allowed; }
-.twf-btn.is-primary{ background:var(--twf-amber); border-color:var(--twf-amber); color:var(--color-bg); }
-.twf-btn.is-primary:hover:not(:disabled){ background:var(--color-accent-hover); border-color:var(--color-accent-hover); }
-.twf-progress{ display:flex; align-items:center; gap:10px; font-family:var(--twf-mono); font-size:12.5px; color:var(--twf-muted); font-variant-numeric:tabular-nums; }
-.twf-dots{ display:flex; gap:4px; }
-.twf-dot{ appearance:none; width:24px; height:22px; padding:8px 0; border:0; border-radius:0; background:var(--twf-line); background-clip:content-box; cursor:pointer; }
-.twf-dot.is-done{ background-color:var(--twf-dim); }
-.twf-dot.is-current{ background-color:var(--tone); }
+.twf-btn.is-next svg{ color:var(--twf-amber); }
 
 .twf-compare{ margin-top:18px; border:1px solid var(--twf-line); border-radius:0; background:var(--twf-panel); padding:16px; display:flex; flex-direction:column; gap:12px; animation:twf-fade .35s ease-out both; }
 .twf-table-wrap{ overflow-x:auto; }
@@ -123,7 +142,7 @@
 
 /* Variante ilustrada */
 .twf-body{ display:flex; flex-direction:column; }
-.twf-body.is-split{ display:grid; grid-template-columns:minmax(0,400px) minmax(0,1fr); gap:24px; align-items:start; margin-top:14px; }
+.twf-body.is-split{ display:grid; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:24px; align-items:start; margin-top:14px; }
 .twf-body.is-split .twf-stage, .twf-body.is-split .twf-panel{ margin-top:0; }
 .twf-body.is-split .twf-panel{ grid-template-columns:minmax(0,1fr); gap:16px; }
 .twf-svg.is-ill{ max-width:420px; }
@@ -154,7 +173,17 @@
 .twf-led{ stroke:none; }
 .twf-led.is-blink{ animation:twf-blink 1.1s steps(2, jump-none) infinite; }
 .twf-scr-amber{ font-family:var(--twf-mono); font-size:9.5px; font-weight:600; fill:var(--twf-amber); letter-spacing:.03em; }
+/* Dominio en la barra de direcciones: coral cuando la web es la falsa */
+.twf-scr-url{ font-family:var(--twf-mono); font-size:6.5px; fill:var(--twf-muted); letter-spacing:.02em; }
+.twf-scr-url.is-fake{ fill:var(--twf-coral); }
 .twf-ill .twf-dialog{ fill:var(--twf-panel); stroke:var(--twf-amber); stroke-width:1.2; }
+.twf-ill .twf-dialog.is-bad{ stroke:var(--twf-coral); }
+.twf-blocked-slash{ stroke:var(--twf-coral); stroke-width:1.8; stroke-linecap:round; }
+/* Web falsa: servidor del atacante, en coral aunque no participe en el paso */
+.twf-ill .twf-fake-server .twf-o{ stroke:var(--twf-coral); }
+/* Dominio bajo el nombre de los servidores */
+.twf-n-site{ font-family:var(--twf-mono); font-size:12px; fill:var(--twf-muted); letter-spacing:.02em; }
+.twf-n-site.is-coral{ fill:var(--twf-coral); font-weight:600; }
 .twf-ill .twf-home.is-touch{ stroke:var(--twf-amber); animation:twf-touch 1.2s ease-in-out infinite; }
 @keyframes twf-touch{ 0%,100%{ stroke-width:1.6; } 50%{ stroke-width:3.2; } }
 .twf-ill-name{ font-size:15px; }
@@ -162,14 +191,14 @@
 @keyframes twf-count{ from{ transform:scaleX(1); } to{ transform:scaleX(0); } }
 @keyframes twf-blink{ 0%{ opacity:1; } 100%{ opacity:.25; } }
 
-@container twf (max-width:480px){
-  .twf-h{ font-size:25px; }
-  .twf-controls{ flex-direction:column; align-items:stretch; }
-  .twf-btns .twf-btn{ flex:1 1 auto; justify-content:center; }
-}
-
 @keyframes twf-draw{ from{ stroke-dasharray:100; stroke-dashoffset:100; } to{ stroke-dasharray:100; stroke-dashoffset:0; } }
 @keyframes twf-fade{ from{ opacity:0; transform:translateY(2px); } to{ opacity:1; transform:none; } }
+
+/* Móvil: menos relleno alrededor para que el diagrama aproveche el ancho de la pantalla */
+@media (max-width: 640px){
+  .twf{ padding:16px 12px 20px; }
+  .twf-stage{ padding:12px 8px 10px; }
+}
 
 @media (prefers-reduced-motion: reduce){
   .twf *, .twf *::before, .twf *::after{ animation:none !important; transition:none !important; }

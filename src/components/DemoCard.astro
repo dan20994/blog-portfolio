@@ -173,6 +173,16 @@ const { demo, title, description } = Astro.props;
     color: var(--color-faint);
   }
 
+  /* En móvil, la tarjeta abierta sale de la columna del artículo y ocupa todo el ancho.
+     -2rem compensa el px-8 del contenedor de src/pages/blog/[slug].astro; se evita
+     100vw porque con barras de scroll clásicas (Windows) provocaría scroll horizontal. */
+  @media (max-width: 640px) {
+    .demo-card[open] {
+      margin-inline: -2rem;
+      border-inline: 0;
+    }
+  }
+
   @media (max-width: 480px) {
     .demo-card summary {
       padding: 16px;

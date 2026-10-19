@@ -7,9 +7,13 @@ import {
   Fingerprint,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
   CheckCircle2,
+  CircleX,
+  TriangleAlert,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
   Play,
   Pause,
   RotateCcw,
@@ -19,205 +23,460 @@ import {
 import "./TotpWebauthnFlow.css";
 
 /*
- * TOTP vs. WebAuthn — animación ilustrativa de dos flujos de autenticación.
+ * TOTP vs. WebAuthn — animación ilustrativa de dos métodos de autenticación,
+ * cada uno en dos recorridos: inicio de sesión legítimo y ataque de phishing
+ * con una web falsa que hace de intermediaria (AiTM).
  * Todo es una simulación visual: no hay red, credenciales ni criptografía real.
  *
- * Uso: <TotpWebauthnFlow />  (props opcionales: initialScenario, autoplayMs)
+ * Uso: <TotpWebauthnFlow />  (props opcionales: initialMethod, initialFlow, autoplayMs)
  */
 
 /* ------------------------------------------------------------------ */
 /* Datos de los escenarios                                             */
 /* ------------------------------------------------------------------ */
 
+const SITE = "tienda-example.com";
+const FAKE = "tienda-exarnple.com";
+
+// Participantes reutilizados por los cuatro recorridos.
+// `site` es el dominio al que responde ese servidor; se dibuja bajo el nombre.
+const NODE = {
+  phone: { name: "App Authenticator", kind: "phone", icon: Smartphone, tone: "violet", key: "clave secreta K" },
+  user: { name: "Usuario", kind: "user", icon: UserRound, tone: "blue" },
+  browser: { name: "Navegador", kind: "browser", icon: Globe, tone: "blue" },
+  auth: { name: "Autenticador", kind: "authenticator", icon: Fingerprint, tone: "amber", key: "clave privada" },
+  // La web falsa es un servidor del atacante: sirve la copia y reenvía todo a la tienda real.
+  attacker: { name: "Web falsa", kind: "attacker", icon: Server, tone: "coral", site: FAKE, siteTone: "coral" },
+  serverK: { name: "Servidor de la tienda", kind: "server", icon: Server, tone: "blue", site: SITE, key: "clave secreta K" },
+  serverPub: { name: "Servidor de la tienda", kind: "server", icon: Server, tone: "blue", site: SITE, key: "clave pública" },
+};
+
+const TOTP_NODES = { phone: NODE.phone, user: NODE.user, browser: NODE.browser, server: NODE.serverK };
+const WA_NODES = { user: NODE.user, auth: NODE.auth, browser: NODE.browser, server: NODE.serverPub };
+
+const FLOWS = [
+  { id: "legit", label: "Flujo legítimo", tone: "green" },
+  { id: "attack", label: "Ataque de phishing", tone: "coral" },
+];
+
+/* ---- TOTP, inicio de sesión legítimo ---- */
+
+const TOTP_LEGIT = {
+  id: "legit",
+  // Nodos dibujados con el texto debajo de cada ilustración, en una columna centrada.
+  illustrated: "below",
+  // Orden de los participantes en el diagrama (cada flecha une vecinos).
+  order: ["phone", "user", "browser", "server"],
+  nodes: TOTP_NODES,
+  initial: {
+    phone: { lines: ["Genera los códigos TOTP"] },
+    user: { lines: ["Quiere iniciar sesión"] },
+    browser: { lines: ["Muestra la pantalla de acceso"], screen: "login", url: SITE },
+    server: { lines: ["Espera un inicio de sesión"] },
+  },
+  steps: [
+    {
+      title: "El usuario introduce su contraseña",
+      text: "El usuario escribe su nombre y su contraseña. El navegador los envía al servidor, que comprueba la contraseña y responde que falta un segundo factor.",
+      detail: { label: "Mensaje", value: "POST /login  →  «Introduce el código de tu app»" },
+      active: ["user", "browser", "server"],
+      status: {
+        user: { lines: ["Escribe su contraseña"] },
+        browser: { lines: ["Envía usuario y contraseña"], screen: "password", url: SITE },
+        server: { lines: ["Contraseña correcta", "Pide el segundo factor"], tone: "amber" },
+      },
+      edges: [
+        { from: "user", to: "browser", label: ["Contraseña"], tone: "blue" },
+        { from: "browser", to: "server", label: ["Usuario +", "contraseña"], tone: "blue" },
+      ],
+    },
+    {
+      title: "La app genera un código TOTP",
+      text: "La app calcula un código de seis dígitos a partir de la clave secreta K y de la hora actual. Esa clave se compartió con el servidor al activar el 2FA, normalmente escaneando un código QR. Cada 30 segundos aparece un código nuevo.",
+      detail: { label: "Cálculo", value: "TOTP = Truncar(HMAC-SHA1(K, ⌊t / 30⌋)) mod 10⁶" },
+      note: "El teléfono no se comunica con el servidor. El código sale solo de la clave K y del reloj.",
+      active: ["phone", "user"],
+      status: {
+        phone: { code: "482 193", lines: ["Muestra un código nuevo", "cada 30 segundos"], tone: "violet" },
+        user: { lines: ["Lee el código en el móvil"] },
+        browser: { lines: ["Pide el código de 6 dígitos"], screen: "otp", url: SITE },
+        server: { lines: ["Espera el código"], tone: "amber" },
+      },
+      edges: [{ from: "phone", to: "user", label: ["482 193"], tone: "violet" }],
+    },
+    {
+      title: "El usuario introduce el código",
+      text: "El usuario copia los seis dígitos en el formulario y el navegador los envía al servidor, asociados al inicio de sesión que quedó pendiente en el paso 1.",
+      detail: { label: "Mensaje", value: "POST /login/2fa  code=482193" },
+      active: ["user", "browser", "server"],
+      status: {
+        user: { lines: ["Escribe 482 193"] },
+        browser: { lines: ["Envía el código"], screen: "code", url: SITE },
+        server: { lines: ["Recibe el código"], tone: "amber" },
+      },
+      edges: [
+        { from: "user", to: "browser", label: ["482 193"], tone: "violet" },
+        { from: "browser", to: "server", label: ["Código", "TOTP"], tone: "violet" },
+      ],
+    },
+    {
+      title: "El servidor valida el código",
+      text: "El servidor calcula el código esperado con su copia de la clave K y su propio reloj, y lo compara con el recibido. Suele aceptar también el intervalo anterior y el siguiente para tolerar pequeñas diferencias de hora.",
+      detail: { label: "Comprobación", value: "HMAC-SHA1(K, ⌊t / 30⌋)  →  482 193" },
+      checks: [
+        "La contraseña es correcta",
+        "El código esperado ahora es 482 193",
+        "El código recibido coincide",
+      ],
+      result: "Autenticación completada",
+      next: { label: "Ver el mismo inicio de sesión bajo phishing", method: "totp", flow: "attack" },
+      active: ["server", "browser", "user"],
+      status: {
+        phone: { lines: ["Pronto mostrará", "otro código"] },
+        user: { lines: ["Ha iniciado sesión"], tone: "green" },
+        browser: { lines: ["Sesión iniciada"], tone: "green", screen: "done", url: SITE },
+        server: { lines: ["Código correcto", "Concede la sesión"], tone: "green" },
+      },
+      edges: [],
+    },
+  ],
+};
+
+/* ---- TOTP bajo un ataque de phishing con una web falsa intermediaria ---- */
+
+const TOTP_ATTACK = {
+  id: "attack",
+  accent: "coral",
+  illustrated: "below",
+  order: ["phone", "user", "browser", "attacker", "server"],
+  nodes: { ...TOTP_NODES, attacker: NODE.attacker },
+  initial: {
+    phone: { lines: ["Genera los códigos TOTP"] },
+    user: { lines: ["Recibe un correo urgente"] },
+    browser: { lines: ["Abre el enlace del correo"], screen: "login", url: FAKE, fake: true },
+    attacker: { lines: ["Copia de la tienda real"], tone: "coral", screen: "relay" },
+    server: { lines: ["Espera un inicio de sesión"] },
+  },
+  steps: [
+    {
+      title: "Un correo lleva a una copia de la web",
+      text: "El enlace abre una página idéntica a la de siempre, pero el dominio no es el mismo: es tienda-exarnple.com, no tienda-example.com. Esa web falsa la controla el atacante y reenvía cada petición a la tienda real en tiempo real. Fíjate en lo fácil que es confundir un dominio falso bien preparado con el original: «rn» casi no se distingue de «m». Es lo que pasó con PyPI, cuyos usuarios recibieron enlaces a pypj.org en lugar de pypi.org.",
+      detail: { label: "Dirección", value: "https://tienda-exarnple.com/login   (la real es https://tienda-example.com)" },
+      active: ["user", "browser", "attacker"],
+      status: {
+        user: { lines: ["Abre el enlace del correo"] },
+        browser: { lines: ["Parece la tienda de siempre"], screen: "login", url: FAKE, fake: true },
+        attacker: { lines: ["Sirve la copia y reenvía todo"], tone: "coral", screen: "relay" },
+      },
+      edges: [
+        { from: "user", to: "browser", label: ["Abre el enlace"], tone: "blue" },
+        { from: "attacker", to: "browser", label: ["Página falsa"], tone: "coral" },
+      ],
+    },
+    {
+      title: "La contraseña se escribe en la web falsa",
+      text: "El usuario escribe su nombre y su contraseña sin notar nada raro. La web falsa se queda una copia y las reenvía al servidor de la tienda, que las comprueba y responde pidiendo el segundo factor.",
+      detail: { label: "Mensaje", value: "POST /login   (la web falsa lo reenvía a tienda-example.com)" },
+      active: ["user", "browser", "attacker", "server"],
+      status: {
+        user: { lines: ["Escribe su contraseña"] },
+        browser: { lines: ["Envía usuario y contraseña"], screen: "password", url: FAKE, fake: true },
+        attacker: { lines: ["Se queda una copia de todo"], tone: "coral", screen: "relay" },
+        server: { lines: ["Contraseña correcta", "Pide el segundo factor"], tone: "amber" },
+      },
+      edges: [
+        { from: "user", to: "browser", label: ["Contraseña"], tone: "blue" },
+        { from: "browser", to: "attacker", label: ["Contraseña"], tone: "coral" },
+        { from: "attacker", to: "server", label: ["Contraseña"], tone: "coral" },
+      ],
+    },
+    {
+      title: "La web falsa reenvía la pantalla del código",
+      text: "El servidor de la tienda pide el código de seis dígitos y la web falsa devuelve esa misma pantalla a la víctima. Lo que ve es exactamente lo que esperaba ver después de la contraseña.",
+      detail: { label: "Respuesta", value: "«Introduce el código de tu app»" },
+      active: ["server", "attacker", "browser", "user"],
+      status: {
+        user: { lines: ["No sospecha nada"] },
+        browser: { lines: ["Pide el código de 6 dígitos"], screen: "otp", url: FAKE, fake: true },
+        attacker: { lines: ["Reenvía la petición"], tone: "coral", screen: "relay" },
+        server: { lines: ["Espera el código"], tone: "amber" },
+      },
+      edges: [
+        { from: "server", to: "attacker", label: ["Pide código"], tone: "amber" },
+        { from: "attacker", to: "browser", label: ["Pide código"], tone: "coral" },
+      ],
+    },
+    {
+      title: "La app genera el código",
+      text: "La app calcula los seis dígitos con la clave secreta K y la hora actual, igual que en un inicio de sesión normal. El usuario los lee en el móvil y los teclea donde cree que debe.",
+      detail: { label: "Cálculo", value: "TOTP = Truncar(HMAC-SHA1(K, ⌊t / 30⌋)) mod 10⁶" },
+      note: "El código no lleva ninguna información sobre la web en la que se va a escribir: la app no se comunica con nadie.",
+      active: ["phone", "user"],
+      status: {
+        phone: { code: "482 193", lines: ["Muestra un código nuevo", "cada 30 segundos"], tone: "violet" },
+        user: { lines: ["Lee el código en el móvil"] },
+      },
+      edges: [{ from: "phone", to: "user", label: ["482 193"], tone: "violet" }],
+    },
+    {
+      title: "El código viaja al atacante y, de ahí, al servidor",
+      text: "El usuario teclea los seis dígitos en la web falsa, que los reenvía al servidor de la tienda en cuestión de segundos, dentro del mismo intervalo en el que el código sigue siendo válido.",
+      detail: { label: "Mensaje", value: "POST /login/2fa  code=482193   (la web falsa lo reenvía a tienda-example.com)" },
+      active: ["user", "browser", "attacker", "server"],
+      status: {
+        user: { lines: ["Escribe 482 193"] },
+        browser: { lines: ["Envía el código"], screen: "code", url: FAKE, fake: true },
+        attacker: { lines: ["Reenvía el código a tiempo"], tone: "coral", screen: "relay" },
+        server: { lines: ["Recibe el código"], tone: "amber" },
+      },
+      edges: [
+        { from: "user", to: "browser", label: ["482 193"], tone: "violet" },
+        { from: "browser", to: "attacker", label: ["Código"], tone: "coral" },
+        { from: "attacker", to: "server", label: ["Código"], tone: "coral" },
+      ],
+    },
+    {
+      title: "El servidor valida el código y entrega la sesión",
+      text: "El servidor calcula el código esperado con su copia de la clave K, comprueba que coincide y concede el acceso. Desde su punto de vista todo encaja, así que devuelve la cookie de sesión… a la web falsa. El atacante ya está dentro de la cuenta.",
+      detail: { label: "Comprobación", value: "HMAC-SHA1(K, ⌊t / 30⌋)  →  482 193  ✓" },
+      checks: [
+        "La contraseña es correcta",
+        "El código recibido coincide",
+        { text: "Nada en el mensaje dice en qué web se escribió el código", ok: false },
+      ],
+      result: "Cuenta comprometida",
+      resultTone: "coral",
+      next: { label: "Ver el mismo ataque con WebAuthn", method: "webauthn", flow: "attack" },
+      active: ["server", "attacker", "user"],
+      status: {
+        phone: { lines: ["Pronto mostrará", "otro código"] },
+        user: { lines: ["Cree que ha iniciado sesión"], tone: "coral" },
+        browser: { lines: ["Pantalla de «todo correcto»"], screen: "hijacked", url: FAKE, fake: true },
+        attacker: { lines: ["El atacante tiene la sesión"], tone: "coral", screen: "idle" },
+        server: { lines: ["Código correcto", "Concede la sesión"], tone: "green" },
+      },
+      edges: [{ from: "server", to: "attacker", label: ["Cookie de sesión"], tone: "coral" }],
+    },
+  ],
+};
+
+/* ---- WebAuthn, inicio de sesión legítimo ---- */
+
+const WA_LEGIT = {
+  id: "legit",
+  illustrated: "below",
+  order: ["user", "auth", "browser", "server"],
+  nodes: WA_NODES,
+  initial: {
+    user: { lines: ["Quiere iniciar sesión"] },
+    auth: { lines: ["Móvil, portátil o llave física"], screen: "idle" },
+    browser: { lines: ["Abre la web real"], screen: "passkey", url: SITE },
+    server: { lines: ["Espera un inicio de sesión"] },
+  },
+  steps: [
+    {
+      title: "El usuario elige «Iniciar sesión con passkey»",
+      text: "No hay contraseña que escribir. El usuario pulsa el botón y el navegador pide al servidor que empiece un inicio de sesión con WebAuthn.",
+      detail: { label: "Mensaje", value: "POST /webauthn/login/options" },
+      active: ["user", "browser", "server"],
+      status: {
+        user: { lines: ["Pulsa «Iniciar sesión con passkey»"] },
+        browser: { lines: ["Pide iniciar sesión"], screen: "passkey", url: SITE },
+        server: { lines: ["Prepara el inicio de sesión"], tone: "amber" },
+      },
+      edges: [{ from: "browser", to: "server", label: ["Iniciar", "sesión"], tone: "blue" }],
+    },
+    {
+      title: "El servidor genera un desafío",
+      text: "El servidor genera un valor aleatorio de un solo uso, el challenge, y lo guarda asociado a este intento. Así una respuesta antigua no sirve para un intento nuevo.",
+      detail: { label: "Challenge", value: "9f2c41b7 … 03d8a71e  (32 bytes aleatorios)" },
+      active: ["server", "browser"],
+      status: {
+        server: { lines: ["Genera un challenge aleatorio"], tone: "amber" },
+        browser: { lines: ["Recibe el challenge"], tone: "amber", screen: "challenge", url: SITE },
+      },
+      edges: [{ from: "server", to: "browser", label: ["Challenge"], tone: "amber" }],
+    },
+    {
+      title: "El usuario confirma su identidad",
+      text: "El navegador pasa el challenge al autenticador junto con el origen de la página, https://tienda-example.com. El autenticador busca la passkey registrada para ese sitio y pide la huella, el rostro o un PIN. Esa comprobación ocurre dentro del dispositivo: la huella no se envía a ningún sitio.",
+      detail: {
+        label: "Datos del cliente",
+        value: '{ type: "webauthn.get", challenge: "9f2c…a71e", origin: "https://tienda-example.com" }',
+      },
+      active: ["user", "auth", "browser"],
+      status: {
+        browser: { lines: ["Envía el challenge y el origen"], screen: "prompt", url: SITE },
+        auth: { lines: ["Pide la huella o el PIN"], tone: "amber", screen: "touch" },
+        user: { lines: ["Confirma con la huella"] },
+      },
+      edges: [
+        { from: "browser", to: "auth", label: ["Challenge +", "origen"], tone: "amber" },
+        { from: "user", to: "auth", label: ["Huella"], tone: "blue" },
+      ],
+    },
+    {
+      title: "El autenticador firma la respuesta",
+      text: "Con la clave privada de esa passkey, el autenticador firma un resumen que incluye el challenge y el origen. La clave privada nunca sale del dispositivo: al servidor solo llega la firma.",
+      detail: {
+        label: "Firma",
+        value: "Sign(clave privada, authenticatorData ‖ SHA-256(clientDataJSON))",
+      },
+      note: "El servidor solo guarda la clave pública. Con ella puede verificar firmas, pero no crearlas.",
+      active: ["auth", "browser", "server"],
+      status: {
+        user: { lines: ["Espera"] },
+        auth: { lines: ["Firma con la clave privada"], tone: "amber", screen: "sign" },
+        browser: { lines: ["Reenvía la respuesta firmada"], screen: "sending", url: SITE },
+        server: { lines: ["Recibe la respuesta"], tone: "amber" },
+      },
+      edges: [
+        { from: "auth", to: "browser", label: ["Respuesta", "firmada"], tone: "amber" },
+        { from: "browser", to: "server", label: ["Respuesta", "firmada"], tone: "amber" },
+      ],
+    },
+    {
+      title: "El servidor verifica la respuesta",
+      text: "El servidor comprueba que la respuesta corresponde a su challenge, que viene del origen esperado y que la firma es válida con la clave pública que guardó al registrar la passkey.",
+      detail: { label: "Verificación", value: "Verify(clave pública, firma, datos firmados)  →  válida" },
+      checks: [
+        "El challenge es el que se emitió",
+        "El origen es https://tienda-example.com",
+        "La firma es válida con la clave pública",
+      ],
+      result: "Autenticación completada",
+      next: { label: "Ver el intento de phishing con passkeys", method: "webauthn", flow: "attack" },
+      active: ["server", "browser", "user"],
+      status: {
+        user: { lines: ["Ha iniciado sesión"], tone: "green" },
+        auth: { lines: ["La clave privada sigue dentro"], screen: "idle" },
+        browser: { lines: ["Sesión iniciada"], tone: "green", screen: "done", url: SITE },
+        server: { lines: ["Firma válida", "Concede la sesión"], tone: "green" },
+      },
+      edges: [],
+    },
+  ],
+};
+
+/* ---- WebAuthn bajo el mismo ataque de phishing ---- */
+
+const WA_ATTACK = {
+  id: "attack",
+  accent: "coral",
+  illustrated: "below",
+  order: ["user", "auth", "browser", "attacker", "server"],
+  nodes: { ...WA_NODES, attacker: NODE.attacker },
+  initial: {
+    user: { lines: ["Recibe el mismo correo"] },
+    auth: { lines: ["Guarda la passkey de tienda-example.com"], screen: "idle" },
+    browser: { lines: ["Abre el enlace del correo"], screen: "passkey", url: FAKE, fake: true },
+    attacker: { lines: ["Copia de la tienda real"], tone: "coral", screen: "relay" },
+    server: { lines: ["Espera un inicio de sesión"] },
+  },
+  steps: [
+    {
+      title: "La misma trampa, con passkeys",
+      text: "El correo y la web falsa son idénticos al caso anterior: el dominio es tienda-exarnple.com y la web falsa reenvía todo a la tienda real. Lo único que cambia es cómo se prueba la identidad.",
+      detail: { label: "Dirección", value: "https://tienda-exarnple.com   (la real es https://tienda-example.com)" },
+      active: ["user", "browser", "attacker"],
+      status: {
+        user: { lines: ["Abre el enlace del correo"] },
+        browser: { lines: ["Parece la tienda de siempre"], screen: "passkey", url: FAKE, fake: true },
+        attacker: { lines: ["Sirve la copia y reenvía todo"], tone: "coral", screen: "relay" },
+      },
+      edges: [{ from: "attacker", to: "browser", label: ["Página falsa"], tone: "coral" }],
+    },
+    {
+      title: "La web falsa consigue un desafío auténtico",
+      text: "El usuario pulsa «Iniciar sesión con passkey». La web falsa pide al servidor de la tienda que empiece un inicio de sesión y recibe un challenge perfectamente válido, que reenvía al navegador.",
+      detail: { label: "Mensaje", value: "POST /webauthn/login/options  →  challenge 9f2c…a71e" },
+      active: ["user", "browser", "attacker", "server"],
+      status: {
+        user: { lines: ["Pulsa «Iniciar sesión con passkey»"] },
+        browser: { lines: ["Pide iniciar sesión"], screen: "passkey", url: FAKE, fake: true },
+        attacker: { lines: ["Pide el challenge por su cuenta"], tone: "coral", screen: "relay" },
+        server: { lines: ["Genera un challenge aleatorio"], tone: "amber" },
+      },
+      edges: [
+        { from: "browser", to: "attacker", label: ["Iniciar sesión"], tone: "coral" },
+        { from: "attacker", to: "server", label: ["Iniciar sesión"], tone: "coral" },
+        { from: "server", to: "attacker", label: ["Challenge"], tone: "amber" },
+      ],
+    },
+    {
+      title: "El navegador compara el origen, no la apariencia",
+      text: "Antes de hablar con el autenticador, el navegador mira el origen de la página y lo compara con el dominio para el que se registró la passkey. No coinciden, así que no ofrece ninguna credencial.",
+      detail: {
+        label: "Comprobación del navegador",
+        value: 'origen "https://tienda-exarnple.com"  ≠  RP ID "tienda-example.com"',
+      },
+      note: "El autenticador nunca se activa: no hay huella que pedir ni firma que generar.",
+      active: ["attacker", "browser", "auth"],
+      status: {
+        user: { lines: ["Espera"] },
+        auth: { lines: ["No recibe ninguna petición"], screen: "idle" },
+        browser: { lines: ["No hay passkey para este sitio"], screen: "blocked", url: FAKE, fake: true },
+        attacker: { lines: ["Reenvía el challenge"], tone: "coral", screen: "relay" },
+      },
+      edges: [
+        { from: "attacker", to: "browser", label: ["Challenge"], tone: "amber" },
+        { from: "browser", to: "auth", label: ["Ninguna passkey"], tone: "coral", blocked: true },
+      ],
+    },
+    {
+      title: "Sin firma no hay nada que reenviar",
+      text: "La web falsa puede copiar la tienda hasta el último píxel, pero se queda sin el dato que necesita. La clave privada no sale del dispositivo y el navegador no la usa fuera del dominio en el que se registró.",
+      detail: { label: "Lo que recibe la web falsa", value: "—  ninguna credencial" },
+      checks: [
+        "La passkey está ligada a tienda-example.com",
+        "El navegador no ofrece la credencial",
+        "El autenticador no llega a firmar",
+      ],
+      result: "Ataque bloqueado",
+      active: ["auth", "browser", "attacker"],
+      status: {
+        auth: { lines: ["La clave privada sigue dentro"], screen: "idle" },
+        browser: { lines: ["No hay nada que enviar"], screen: "blocked", url: FAKE, fake: true },
+        attacker: { lines: ["Se queda sin credencial"], tone: "coral", screen: "idle" },
+      },
+      edges: [],
+    },
+    {
+      title: "Segunda barrera: el servidor también mira el origen",
+      text: "Supongamos que el atacante consiguiera una respuesta firmada por otra vía. Tampoco le serviría: el objeto que se firma incluye el origen de la página, y el servidor lo compara con el suyo antes de aceptar la firma.",
+      detail: {
+        label: "Verificación",
+        value: 'origin "https://tienda-exarnple.com"  ≠  "https://tienda-example.com"  →  rechazada',
+      },
+      note: "La comprobación la hace el servidor, no depende de que el usuario se fije en el dominio.",
+      checks: [
+        "El challenge es el que se emitió",
+        { text: "El origen firmado no es el del servidor", ok: false },
+      ],
+      result: "Respuesta rechazada",
+      next: { label: "Ver el flujo normal con passkeys", method: "webauthn", flow: "legit" },
+      active: ["attacker", "server"],
+      status: {
+        attacker: { lines: ["Reenvía una respuesta firmada"], tone: "coral", screen: "relay" },
+        server: { lines: ["Origen incorrecto", "Rechaza la respuesta"], tone: "green" },
+      },
+      edges: [{ from: "attacker", to: "server", label: ["Respuesta firmada"], tone: "coral" }],
+    },
+  ],
+};
+
 const SCENARIOS = {
   totp: {
     id: "totp",
     tab: "TOTP",
     tone: "violet",
-    // Nodos dibujados con el texto debajo de cada ilustración, en una columna centrada.
-    illustrated: "below",
-    // Orden de los participantes en el diagrama (cada flecha une vecinos).
-    order: ["phone", "user", "browser", "server"],
-    nodes: {
-      phone: { name: "App Authenticator", kind: "phone", icon: Smartphone, tone: "violet", key: "clave secreta K" },
-      user: { name: "Usuario", kind: "user", icon: UserRound, tone: "blue" },
-      browser: { name: "Navegador", kind: "browser", icon: Globe, tone: "blue" },
-      server: { name: "Servidor", kind: "server", icon: Server, tone: "blue", key: "clave secreta K" },
-    },
-    initial: {
-      phone: { lines: ["Genera los códigos TOTP"] },
-      user: { lines: ["Quiere iniciar sesión"] },
-      browser: { lines: ["Muestra la pantalla de acceso"], screen: "login" },
-      server: { lines: ["Espera un inicio de sesión"] },
-    },
-    steps: [
-      {
-        title: "El usuario introduce su contraseña",
-        text: "El usuario escribe su nombre y su contraseña. El navegador los envía al servidor, que comprueba la contraseña y responde que falta un segundo factor.",
-        detail: { label: "Mensaje", value: "POST /login  →  «Introduce el código de tu app»" },
-        active: ["user", "browser", "server"],
-        status: {
-          user: { lines: ["Escribe su contraseña"] },
-          browser: { lines: ["Envía usuario y contraseña"], screen: "password" },
-          server: { lines: ["Contraseña correcta", "Pide el segundo factor"], tone: "amber" },
-        },
-        edges: [
-          { from: "user", to: "browser", label: ["Contraseña"], tone: "blue" },
-          { from: "browser", to: "server", label: ["Usuario +", "contraseña"], tone: "blue" },
-        ],
-      },
-      {
-        title: "La app genera un código TOTP",
-        text: "La app calcula un código de seis dígitos a partir de la clave secreta K y de la hora actual. Esa clave se compartió con el servidor al activar el 2FA, normalmente escaneando un código QR. Cada 30 segundos aparece un código nuevo.",
-        detail: { label: "Cálculo", value: "TOTP = Truncar(HMAC-SHA1(K, ⌊t / 30⌋)) mod 10⁶" },
-        note: "El teléfono no se comunica con el servidor. El código sale solo de la clave K y del reloj.",
-        active: ["phone", "user"],
-        status: {
-          phone: { code: "482 193", lines: ["Muestra un código nuevo", "cada 30 segundos"], tone: "violet" },
-          user: { lines: ["Lee el código en el móvil"] },
-          browser: { lines: ["Pide el código de 6 dígitos"], screen: "otp" },
-          server: { lines: ["Espera el código"], tone: "amber" },
-        },
-        edges: [{ from: "phone", to: "user", label: ["482 193"], tone: "violet" }],
-      },
-      {
-        title: "El usuario introduce el código",
-        text: "El usuario copia los seis dígitos en el formulario y el navegador los envía al servidor, asociados al inicio de sesión que quedó pendiente en el paso 1.",
-        detail: { label: "Mensaje", value: "POST /login/2fa  code=482193" },
-        active: ["user", "browser", "server"],
-        status: {
-          user: { lines: ["Escribe 482 193"] },
-          browser: { lines: ["Envía el código"], screen: "code" },
-          server: { lines: ["Recibe el código"], tone: "amber" },
-        },
-        edges: [
-          { from: "user", to: "browser", label: ["482 193"], tone: "violet" },
-          { from: "browser", to: "server", label: ["Código", "TOTP"], tone: "violet" },
-        ],
-      },
-      {
-        title: "El servidor valida el código",
-        text: "El servidor calcula el código esperado con su copia de la clave K y su propio reloj, y lo compara con el recibido. Suele aceptar también el intervalo anterior y el siguiente para tolerar pequeñas diferencias de hora.",
-        detail: { label: "Comprobación", value: "HMAC-SHA1(K, ⌊t / 30⌋)  →  482 193" },
-        checks: [
-          "La contraseña es correcta",
-          "El código esperado ahora es 482 193",
-          "El código recibido coincide",
-        ],
-        result: "Autenticación completada",
-        active: ["server", "browser", "user"],
-        status: {
-          phone: { lines: ["Pronto mostrará", "otro código"] },
-          user: { lines: ["Ha iniciado sesión"], tone: "green" },
-          browser: { lines: ["Sesión iniciada"], tone: "green", screen: "done" },
-          server: { lines: ["Código correcto", "Concede la sesión"], tone: "green" },
-        },
-        edges: [],
-      },
-    ],
+    flows: { legit: TOTP_LEGIT, attack: TOTP_ATTACK },
   },
-
   webauthn: {
     id: "webauthn",
     tab: "WebAuthn / Passkeys",
     tone: "amber",
-    // Nodos dibujados con el texto debajo de cada ilustración, en una columna centrada.
-    illustrated: "below",
-    order: ["user", "auth", "browser", "server"],
-    nodes: {
-      user: { name: "Usuario", kind: "user", icon: UserRound, tone: "blue" },
-      auth: { name: "Autenticador", kind: "authenticator", icon: Fingerprint, tone: "amber", key: "clave privada" },
-      browser: { name: "Navegador", kind: "browser", icon: Globe, tone: "blue" },
-      server: { name: "Servidor", kind: "server", icon: Server, tone: "blue", key: "clave pública" },
-    },
-    initial: {
-      user: { lines: ["Quiere iniciar sesión"] },
-      auth: { lines: ["Móvil, portátil o llave física"], screen: "idle" },
-      browser: { lines: ["Abre tienda.example"], screen: "passkey" },
-      server: { lines: ["Espera un inicio de sesión"] },
-    },
-    steps: [
-      {
-        title: "El usuario elige «Iniciar sesión con passkey»",
-        text: "No hay contraseña que escribir. El usuario pulsa el botón y el navegador pide al servidor que empiece un inicio de sesión con WebAuthn.",
-        detail: { label: "Mensaje", value: "POST /webauthn/login/options" },
-        active: ["user", "browser", "server"],
-        status: {
-          user: { lines: ["Pulsa «Iniciar sesión con passkey»"] },
-          browser: { lines: ["Pide iniciar sesión"], screen: "passkey" },
-          server: { lines: ["Prepara el inicio de sesión"], tone: "amber" },
-        },
-        edges: [{ from: "browser", to: "server", label: ["Iniciar", "sesión"], tone: "blue" }],
-      },
-      {
-        title: "El servidor genera un desafío",
-        text: "El servidor genera un valor aleatorio de un solo uso, el challenge, y lo guarda asociado a este intento. Así una respuesta antigua no sirve para un intento nuevo.",
-        detail: { label: "Challenge", value: "9f2c41b7 … 03d8a71e  (32 bytes aleatorios)" },
-        active: ["server", "browser"],
-        status: {
-          server: { lines: ["Genera un challenge aleatorio"], tone: "amber" },
-          browser: { lines: ["Recibe el challenge"], tone: "amber", screen: "challenge" },
-        },
-        edges: [{ from: "server", to: "browser", label: ["Challenge"], tone: "amber" }],
-      },
-      {
-        title: "El usuario confirma su identidad",
-        text: "El navegador pasa el challenge al autenticador junto con el origen de la página, https://tienda.example. El autenticador busca la passkey registrada para ese sitio y pide la huella, el rostro o un PIN. Esa comprobación ocurre dentro del dispositivo: la huella no se envía a ningún sitio.",
-        detail: {
-          label: "Datos del cliente",
-          value: '{ type: "webauthn.get", challenge: "9f2c…a71e", origin: "https://tienda.example" }',
-        },
-        active: ["user", "auth", "browser"],
-        status: {
-          browser: { lines: ["Envía el challenge y el origen"], screen: "prompt" },
-          auth: { lines: ["Pide la huella o el PIN"], tone: "amber", screen: "touch" },
-          user: { lines: ["Confirma con la huella"] },
-        },
-        edges: [
-          { from: "browser", to: "auth", label: ["Challenge +", "origen"], tone: "amber" },
-          { from: "user", to: "auth", label: ["Huella"], tone: "blue" },
-        ],
-      },
-      {
-        title: "El autenticador firma la respuesta",
-        text: "Con la clave privada de esa passkey, el autenticador firma un resumen que incluye el challenge y el origen. La clave privada nunca sale del dispositivo: al servidor solo llega la firma.",
-        detail: {
-          label: "Firma",
-          value: "Sign(clave privada, authenticatorData ‖ SHA-256(clientDataJSON))",
-        },
-        note: "El servidor solo guarda la clave pública. Con ella puede verificar firmas, pero no crearlas.",
-        active: ["auth", "browser", "server"],
-        status: {
-          user: { lines: ["Espera"] },
-          auth: { lines: ["Firma con la clave privada"], tone: "amber", screen: "sign" },
-          browser: { lines: ["Reenvía la respuesta firmada"], screen: "sending" },
-          server: { lines: ["Recibe la respuesta"], tone: "amber" },
-        },
-        edges: [
-          { from: "auth", to: "browser", label: ["Respuesta", "firmada"], tone: "amber" },
-          { from: "browser", to: "server", label: ["Respuesta", "firmada"], tone: "amber" },
-        ],
-      },
-      {
-        title: "El servidor verifica la respuesta",
-        text: "El servidor comprueba que la respuesta corresponde a su challenge, que viene del origen esperado y que la firma es válida con la clave pública que guardó al registrar la passkey.",
-        detail: { label: "Verificación", value: "Verify(clave pública, firma, datos firmados)  →  válida" },
-        checks: [
-          "El challenge es el que se emitió",
-          "El origen es https://tienda.example",
-          "La firma es válida con la clave pública",
-        ],
-        result: "Autenticación completada",
-        active: ["server", "browser", "user"],
-        status: {
-          user: { lines: ["Ha iniciado sesión"], tone: "green" },
-          auth: { lines: ["La clave privada sigue dentro"], screen: "idle" },
-          browser: { lines: ["Sesión iniciada"], tone: "green", screen: "done" },
-          server: { lines: ["Firma válida", "Concede la sesión"], tone: "green" },
-        },
-        edges: [],
-      },
-    ],
+    flows: { legit: WA_LEGIT, attack: WA_ATTACK },
   },
 };
 
@@ -227,6 +486,7 @@ const COMPARISON = {
     ["Qué envía el usuario", "Un código de 6 dígitos que copia a mano", "Una firma que genera el autenticador"],
     ["Validez", "El código sirve durante su intervalo de unos 30 s", "Cada challenge sirve para un único intento"],
     ["Vinculación al sitio", "El código no depende de la web donde se escribe", "La firma incluye el origen de la página"],
+    ["Phishing con una web falsa intermediaria", "El código se puede reenviar dentro de su intervalo", "La credencial no se ofrece fuera del dominio registrado"],
     ["Si se filtra la base de datos del servidor", "Quedan expuestas las claves K", "Solo quedan expuestas claves públicas"],
   ],
   conclusion:
@@ -268,9 +528,13 @@ const ART = {
   phone: { w: 62, h: 116 },
   authenticator: { w: 62, h: 116 },
   user: { w: 48, h: 48 },
-  browser: { w: 108, h: 74 },
+  browser: { w: 118, h: 78 },
   server: { w: 76, h: 80 },
+  attacker: { w: 76, h: 80 },
 };
+
+// Alto de la línea con el dominio que algunos nodos muestran bajo su nombre.
+const SITE_LINE_H = 17;
 
 // "side": columna de dibujos a la izquierda y su texto a la derecha.
 // "below": columna centrada; el texto va debajo de cada dibujo y la flecha sale después del texto.
@@ -278,14 +542,15 @@ function computeIllustratedLayout(order, nodes, textPos) {
   if (textPos === "below") {
     const W = 360;
     const pad = 14;
-    const gap = 58;
+    // Con cinco participantes el hueco se reduce para que el diagrama no sea desproporcionado.
+    const gap = order.length >= 5 ? 48 : 58;
     const cx = W / 2;
     const pos = {};
     let y = pad;
     order.forEach((id, i) => {
       const { w, h } = ART[nodes[id].kind];
-      // Nombre + hasta dos líneas de estado + línea de la clave, si la hay.
-      const textH = 64 + (nodes[id].key ? 18 : 0);
+      // Nombre + dominio, si lo hay + hasta dos líneas de estado + línea de la clave, si la hay.
+      const textH = 64 + (nodes[id].site ? SITE_LINE_H : 0) + (nodes[id].key ? 18 : 0);
       pos[id] = { x: cx, y: y + h / 2, top: y, artBottom: y + h, bottom: y + h + textH, w, h, i };
       y += h + textH + gap;
     });
@@ -317,7 +582,7 @@ function edgeGeometry(edge, layout, mode, paired) {
     const side = paired && forward ? -1 : 1;
     const x = a.x + off;
     const y1 = forward ? a.bottom + 7 : a.top - 7;
-    const y2 = forward ? b.top - 9 : b.bottom + 9;
+    const y2 = forward ? b.top - 12.5 : b.bottom + 12.5;
     const my = (y1 + y2) / 2;
     const lines = edge.label || [];
     const labels = lines.map((text, k) => ({
@@ -338,7 +603,7 @@ function edgeGeometry(edge, layout, mode, paired) {
     const dir = forward ? 1 : -1;
     const y = a.y + offset;
     const x1 = a.x + dir * (layout.w / 2 + 5);
-    const x2 = b.x - dir * (layout.w / 2 + 7);
+    const x2 = b.x - dir * (layout.w / 2 + 10.5);
     const mx = (x1 + x2) / 2;
     const labels = lines.map((text, k) => ({
       text,
@@ -352,7 +617,7 @@ function edgeGeometry(edge, layout, mode, paired) {
   const dir = forward ? 1 : -1;
   const x = a.x + offset;
   const y1 = a.y + dir * (layout.h / 2 + 5);
-  const y2 = b.y - dir * (layout.h / 2 + 7);
+  const y2 = b.y - dir * (layout.h / 2 + 10.5);
   const my = (y1 + y2) / 2;
   const labels = lines.map((text, k) => ({
     text,
@@ -559,77 +824,105 @@ function BrowserArt({ left, top, status }) {
   const screen = status.screen || "login";
   const fx = left + 14;
   const fw = w - 28;
+  const cx = left + w / 2;
   return (
     <>
       <rect className="twf-o" x={left} y={top} width={w} height={h} rx="7" />
-      <line className="twf-l" x1={left} y1={top + 15} x2={left + w} y2={top + 15} />
-      <circle className="twf-win-btn is-close" cx={left + 9} cy={top + 7.5} r="2.6" />
-      <circle className="twf-win-btn is-min" cx={left + 17} cy={top + 7.5} r="2.6" />
-      <circle className="twf-win-btn is-max" cx={left + 25} cy={top + 7.5} r="2.6" />
-      <rect className="twf-field" x={left + 34} y={top + 4} width={w - 42} height="7.5" rx="3.75" />
+      <line className="twf-l" x1={left} y1={top + 18} x2={left + w} y2={top + 18} />
+      <circle className="twf-win-btn is-close" cx={left + 9} cy={top + 9} r="2.6" />
+      <circle className="twf-win-btn is-min" cx={left + 17} cy={top + 9} r="2.6" />
+      <circle className="twf-win-btn is-max" cx={left + 25} cy={top + 9} r="2.6" />
+      <rect className="twf-field" x={left + 33} y={top + 3.5} width={w - 41} height="11" rx="5.5" />
+      {status.url && (
+        <text
+          className={`twf-scr-url${status.fake ? " is-fake" : ""}`}
+          x={left + 38}
+          y={top + 12.2}
+          // La barra de direcciones es estrecha: se ajusta el texto para que no desborde.
+          textLength={Math.min(status.url.length * 3.9, w - 51)}
+          lengthAdjust="spacingAndGlyphs"
+        >
+          {status.url}
+        </text>
+      )}
 
       <g key={screen} className="twf-fadein">
         {(screen === "login" || screen === "password") && (
           <>
-            <rect className="twf-field" x={fx} y={top + 23} width={fw} height="12" rx="3" />
-            <rect className="twf-field" x={fx} y={top + 40} width={fw} height="12" rx="3" />
+            <rect className="twf-field" x={fx} y={top + 27} width={fw} height="12" rx="3" />
+            <rect className="twf-field" x={fx} y={top + 44} width={fw} height="12" rx="3" />
             {screen === "password" && (
               <>
-                <line className="twf-typed" x1={fx + 5} y1={top + 29} x2={fx + 34} y2={top + 29} />
-                <text className="twf-scr-text" x={fx + 5} y={top + 49.5}>
+                <line className="twf-typed" x1={fx + 5} y1={top + 33} x2={fx + 34} y2={top + 33} />
+                <text className="twf-scr-text" x={fx + 5} y={top + 53.5}>
                   ••••••••
                 </text>
               </>
             )}
-            <rect className="twf-win-cta" x={fx} y={top + 57} width="34" height="9" rx="3" />
+            <rect className="twf-win-cta" x={fx} y={top + 61} width="34" height="9" rx="3" />
           </>
         )}
         {(screen === "otp" || screen === "code") && (
           <>
-            <rect className="twf-field" x={fx} y={top + 27} width={fw} height="16" rx="3" />
+            <rect className="twf-field" x={fx} y={top + 31} width={fw} height="16" rx="3" />
             {screen === "code" ? (
-              <text className="twf-scr-otp" x={left + w / 2} y={top + 39} textAnchor="middle">
+              <text className="twf-scr-otp" x={cx} y={top + 43} textAnchor="middle">
                 482 193
               </text>
             ) : (
-              <text className="twf-scr-hint" x={left + w / 2} y={top + 39} textAnchor="middle">
+              <text className="twf-scr-hint" x={cx} y={top + 43} textAnchor="middle">
                 _ _ _ _ _ _
               </text>
             )}
-            <rect className="twf-win-cta" x={fx} y={top + 52} width="34" height="9" rx="3" />
+            <rect className="twf-win-cta" x={fx} y={top + 56} width="34" height="9" rx="3" />
           </>
         )}
         {screen === "passkey" && (
           <>
-            <line className="twf-l" x1={fx} y1={top + 27} x2={fx + 42} y2={top + 27} />
-            <rect className="twf-win-cta" x={fx} y={top + 37} width={fw} height="16" rx="3" />
+            <line className="twf-l" x1={fx} y1={top + 31} x2={fx + 42} y2={top + 31} />
+            <rect className="twf-win-cta" x={fx} y={top + 41} width={fw} height="16" rx="3" />
             <g style={{ color: "var(--twf-bg)" }}>
-              <KeyRound x={left + w / 2 - 5} y={top + 40} size={10} strokeWidth={2.2} aria-hidden="true" />
+              <KeyRound x={cx - 5} y={top + 44} size={10} strokeWidth={2.2} aria-hidden="true" />
             </g>
           </>
         )}
         {(screen === "challenge" || screen === "sending") && (
           <>
-            <rect className="twf-field" x={fx} y={top + 28} width={fw} height="16" rx="3" />
-            <text className="twf-scr-amber" x={left + w / 2} y={top + 39.5} textAnchor="middle">
+            <rect className="twf-field" x={fx} y={top + 32} width={fw} height="16" rx="3" />
+            <text className="twf-scr-amber" x={cx} y={top + 43.5} textAnchor="middle">
               {screen === "challenge" ? "9f2c…a71e" : "sig 3045…"}
             </text>
-            <line className="twf-l" x1={fx} y1={top + 55} x2={fx + 30} y2={top + 55} />
+            <line className="twf-l" x1={fx} y1={top + 59} x2={fx + 30} y2={top + 59} />
           </>
         )}
         {screen === "prompt" && (
           <>
-            <line className="twf-l" x1={fx} y1={top + 25} x2={fx + fw} y2={top + 25} />
-            <line className="twf-l" x1={fx} y1={top + 63} x2={fx + fw} y2={top + 63} />
-            <rect className="twf-dialog" x={left + 26} y={top + 30} width={w - 52} height="28" rx="5" />
+            <line className="twf-l" x1={fx} y1={top + 29} x2={fx + fw} y2={top + 29} />
+            <line className="twf-l" x1={fx} y1={top + 67} x2={fx + fw} y2={top + 67} />
+            <rect className="twf-dialog" x={left + 26} y={top + 34} width={w - 52} height="28" rx="5" />
             <g style={{ color: "var(--twf-amber)" }}>
-              <Fingerprint x={left + w / 2 - 9} y={top + 35} size={18} strokeWidth={1.6} aria-hidden="true" />
+              <Fingerprint x={cx - 9} y={top + 39} size={18} strokeWidth={1.6} aria-hidden="true" />
             </g>
           </>
         )}
+        {screen === "blocked" && (
+          <>
+            <line className="twf-l" x1={fx} y1={top + 29} x2={fx + fw} y2={top + 29} />
+            <rect className="twf-dialog is-bad" x={left + 26} y={top + 34} width={w - 52} height="28" rx="5" />
+            <g style={{ color: "var(--twf-coral)" }}>
+              <Fingerprint x={cx - 9} y={top + 39} size={18} strokeWidth={1.6} aria-hidden="true" />
+            </g>
+            <line className="twf-blocked-slash" x1={cx - 11} y1={top + 59} x2={cx + 11} y2={top + 37} />
+          </>
+        )}
+        {screen === "hijacked" && (
+          <g style={{ color: "var(--twf-coral)" }}>
+            <TriangleAlert x={cx - 13} y={top + 34} size={26} strokeWidth={1.7} aria-hidden="true" />
+          </g>
+        )}
         {screen === "done" && (
           <g style={{ color: "var(--twf-green)" }}>
-            <CheckCircle2 x={left + w / 2 - 13} y={top + 30} size={26} strokeWidth={1.7} aria-hidden="true" />
+            <CheckCircle2 x={cx - 13} y={top + 34} size={26} strokeWidth={1.7} aria-hidden="true" />
           </g>
         )}
       </g>
@@ -664,6 +957,35 @@ function ServerArt({ left, top, status }) {
   );
 }
 
+// Web falsa: el mismo tipo de servidor que la tienda, pero del atacante y siempre en coral.
+// Mientras reenvía peticiones ("relay"), el primer led parpadea.
+function AttackerArt({ left, top, status }) {
+  const w = ART.attacker.w;
+  const relay = status.screen === "relay";
+  return (
+    <g className="twf-fake-server">
+      {[0, 1, 2].map((k) => {
+        const y = top + k * 28;
+        return (
+          <g key={k}>
+            <rect className="twf-o" x={left} y={y} width={w} height="24" rx="4" />
+            <circle
+              className={`twf-led ${k === 0 && relay ? "is-blink" : ""}`}
+              style={{ fill: k === 0 ? "var(--twf-coral)" : "var(--twf-dim)" }}
+              cx={left + 11}
+              cy={y + 12}
+              r="2.6"
+            />
+            <circle className="twf-led" style={{ fill: "var(--twf-dim)" }} cx={left + 19} cy={y + 12} r="2.6" />
+            <line className="twf-l" x1={left + 34} y1={y + 9} x2={left + w - 10} y2={y + 9} />
+            <line className="twf-l" x1={left + 34} y1={y + 15} x2={left + w - 10} y2={y + 15} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 function IllustratedNode({ def, pos, layout, status, active, changed, stepKey }) {
   const tone = `var(--twf-${def.tone})`;
   const st = status || { lines: [] };
@@ -675,9 +997,12 @@ function IllustratedNode({ def, pos, layout, status, active, changed, stepKey })
   const anchor = below ? "middle" : "start";
 
   const lines = st.lines || [];
-  const blockH = 16 + lines.length * 17 + (def.key ? 18 : 0);
+  // Dominio del servidor, justo debajo del nombre: desplaza el resto del texto.
+  const siteH = def.site ? SITE_LINE_H : 0;
+  const blockH = 16 + siteH + lines.length * 17 + (def.key ? 18 : 0);
   const nameY = below ? pos.artBottom + 22 : pos.y - blockH / 2 + 12;
-  const keyY = nameY + 19 + lines.length * 17 + 3;
+  const linesY = nameY + 19 + siteH;
+  const keyY = linesY + lines.length * 17 + 3;
   // Línea de la clave: icono + texto, centrada bajo el dibujo o alineada a la izquierda al lado.
   const keyW = def.key ? def.key.length * 6.6 + 17 : 0;
   const keyX = below ? pos.x - keyW / 2 : tx;
@@ -691,6 +1016,8 @@ function IllustratedNode({ def, pos, layout, status, active, changed, stepKey })
       <UserArt left={left} top={top} />
     ) : def.kind === "browser" ? (
       <BrowserArt left={left} top={top} status={st} />
+    ) : def.kind === "attacker" ? (
+      <AttackerArt left={left} top={top} status={st} />
     ) : (
       <ServerArt left={left} top={top} status={st} />
     );
@@ -701,6 +1028,16 @@ function IllustratedNode({ def, pos, layout, status, active, changed, stepKey })
       <text className="twf-n-name twf-ill-name" x={tx} y={nameY} textAnchor={anchor}>
         {def.name}
       </text>
+      {def.site && (
+        <text
+          className={`twf-n-site${def.siteTone ? ` is-${def.siteTone}` : ""}`}
+          x={tx}
+          y={nameY + 17}
+          textAnchor={anchor}
+        >
+          {def.site}
+        </text>
+      )}
       <g key={changed ? `s${stepKey}` : "base"} className={changed ? "twf-fadein" : undefined}>
         {lines.map((line, i) => (
           <text
@@ -708,7 +1045,7 @@ function IllustratedNode({ def, pos, layout, status, active, changed, stepKey })
             className="twf-n-status twf-ill-status"
             style={statusColor ? { fill: statusColor } : undefined}
             x={tx}
-            y={nameY + 19 + i * 17}
+            y={linesY + i * 17}
             textAnchor={anchor}
           >
             {line}
@@ -729,6 +1066,32 @@ function IllustratedNode({ def, pos, layout, status, active, changed, stepKey })
 
 function DiagramEdge({ edge, geom, state, uid, index, count, reduced }) {
   const { x1, y1, x2, y2, labels } = geom;
+
+  // Flecha que no llega a su destino: se corta y se marca con una X.
+  if (edge.blocked) {
+    const t = 0.58;
+    const bx = x1 + (x2 - x1) * t;
+    const by = y1 + (y2 - y1) * t;
+    return (
+      <g className={`twf-edge is-blocked is-${state}`} style={{ "--tone": "var(--twf-coral)" }}>
+        <line x1={x1} y1={y1} x2={bx} y2={by} />
+        {/* La X solo cuando el intento ya ha ocurrido: en "future" sería adelantar el final. */}
+        {state !== "future" && (
+          <g className="twf-blocked-x">
+            <line x1={bx - 5} y1={by - 5} x2={bx + 5} y2={by + 5} />
+            <line x1={bx + 5} y1={by - 5} x2={bx - 5} y2={by + 5} />
+          </g>
+        )}
+        {state === "current" &&
+          labels.map((l, i) => (
+            <text key={i} className="twf-e-label" x={l.x} y={l.y} textAnchor={l.anchor}>
+              {l.text}
+            </text>
+          ))}
+      </g>
+    );
+  }
+
   const marker = `url(#${uid}-m-${state === "current" ? edge.tone : state})`;
 
   // Cada flecha del paso tiene su propio turno dentro del ciclo, para que se lea el orden.
@@ -781,19 +1144,23 @@ function DiagramEdge({ edge, geom, state, uid, index, count, reduced }) {
 /* Componente principal                                                */
 /* ------------------------------------------------------------------ */
 
-export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs = 3800 }) {
+export default function TotpWebauthnFlow({ initialMethod = "totp", initialFlow = "attack", autoplayMs = 3800 }) {
   const rawId = useId();
   const uid = "twf" + rawId.replace(/[^a-zA-Z0-9]/g, "");
   const rootRef = useRef(null);
   const width = useElementWidth(rootRef, 880);
   const reduced = usePrefersReducedMotion();
 
-  const [scenarioId, setScenarioId] = useState(SCENARIOS[initialScenario] ? initialScenario : "totp");
+  const [methodId, setMethodId] = useState(SCENARIOS[initialMethod] ? initialMethod : "totp");
+  const [flowId, setFlowId] = useState(initialFlow === "legit" ? "legit" : "attack");
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
 
-  const scenario = SCENARIOS[scenarioId];
+  const method = SCENARIOS[methodId];
+  const scenario = method.flows[flowId];
+  const flowLabel = (FLOWS.find((f) => f.id === flowId) || FLOWS[0]).label;
+  const accent = scenario.accent || method.tone;
   const total = scenario.steps.length;
   const current = scenario.steps[step];
   const isFirst = step === 0;
@@ -802,6 +1169,7 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
   const illustrated = Boolean(scenario.illustrated);
   // En pantallas anchas, la variante ilustrada pone el diagrama y la explicación lado a lado.
   const split = illustrated && width >= 720;
+  const runKey = `${methodId}-${flowId}`;
 
   // Reproducción automática: un temporizador por paso, siempre limpiado.
   useEffect(() => {
@@ -812,7 +1180,7 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
     }
     const t = setTimeout(() => setStep((s) => Math.min(s + 1, total - 1)), autoplayMs);
     return () => clearTimeout(t);
-  }, [playing, step, total, autoplayMs, scenarioId]);
+  }, [playing, step, total, autoplayMs, runKey]);
 
   const layout = useMemo(
     () =>
@@ -853,12 +1221,38 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
 
   const geomFor = (e) => edgeGeometry(e, layout, mode, pairedKeys.has(`${e.to}>${e.from}`));
 
-  const selectScenario = (id) => {
-    if (id === scenarioId) return;
-    setScenarioId(id);
+  const checks = (current.checks || []).map((c) =>
+    typeof c === "string" ? { text: c, ok: true } : { ok: true, ...c }
+  );
+  const badResult = current.resultTone === "coral";
+
+  const legend = [
+    { tone: "blue", label: "Comunicación" },
+    { tone: "violet", label: "Código TOTP" },
+    { tone: "amber", label: "Desafío y criptografía" },
+    { tone: "green", label: "Verificado" },
+    ...(flowId === "attack" ? [{ tone: "coral", label: "Atacante" }] : []),
+  ];
+
+  const restart = () => {
     setStep(0);
     setPlaying(false);
     setShowCompare(false);
+  };
+  const selectMethod = (id) => {
+    if (id === methodId) return;
+    setMethodId(id);
+    restart();
+  };
+  const selectFlow = (id) => {
+    if (id === flowId) return;
+    setFlowId(id);
+    restart();
+  };
+  const jumpTo = (next) => {
+    setMethodId(next.method);
+    setFlowId(next.flow);
+    restart();
   };
   const goTo = (n) => {
     setPlaying(false);
@@ -879,54 +1273,115 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
   };
 
   return (
-    <section className="twf" ref={rootRef} aria-labelledby={`${uid}-title`}>
-      <header className="twf-head">
-        <span className="twf-eyebrow">Simulación visual · sin datos reales</span>
-        <h3 className="twf-h" id={`${uid}-title`}>
-          <span className="twf-h-totp">TOTP</span> <span className="twf-h-vs">vs.</span>{" "}
-          <span className="twf-h-wa">WebAuthn</span>
-        </h3>
-        <p className="twf-sub">Dos flujos de autenticación. Dos modelos de seguridad.</p>
-        <p className="twf-desc">
-          Explora paso a paso cómo funciona cada método y qué llega realmente al servidor.
-        </p>
-      </header>
+    <section className="twf" ref={rootRef} aria-label="TOTP vs. WebAuthn">
+      <div className="twf-head">
+        <div className="twf-tabs" role="tablist" aria-label="Método de autenticación">
+          {Object.values(SCENARIOS).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              id={`${uid}-tab-${m.id}`}
+              aria-selected={m.id === methodId}
+              aria-controls={`${uid}-stage`}
+              className="twf-tab"
+              style={{ "--tone": `var(--twf-${m.tone})` }}
+              onClick={() => selectMethod(m.id)}
+            >
+              <span className="twf-tab-dot" aria-hidden="true" />
+              {m.tab}
+            </button>
+          ))}
+        </div>
 
-      <div className="twf-tabs" role="tablist" aria-label="Escenario">
-        {Object.values(SCENARIOS).map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            role="tab"
-            id={`${uid}-tab-${s.id}`}
-            aria-selected={s.id === scenarioId}
-            aria-controls={`${uid}-stage`}
-            className="twf-tab"
-            style={{ "--tone": `var(--twf-${s.tone})` }}
-            onClick={() => selectScenario(s.id)}
-          >
-            <span className="twf-tab-dot" aria-hidden="true" />
-            {s.tab}
-          </button>
-        ))}
+        <div className="twf-switch" role="group" aria-label="Recorrido">
+          {FLOWS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className="twf-switch-btn"
+              aria-pressed={f.id === flowId}
+              style={{ "--tone": `var(--twf-${f.tone})` }}
+              onClick={() => selectFlow(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className={`twf-body ${split ? "is-split" : ""}`}>
-      <div className="twf-stage" id={`${uid}-stage`} role="tabpanel" aria-labelledby={`${uid}-tab-${scenarioId}`}>
+      <div className="twf-stage" id={`${uid}-stage`} role="tabpanel" aria-labelledby={`${uid}-tab-${methodId}`}>
+        <div className="twf-toolbar" style={{ "--tone": `var(--twf-${accent})` }}>
+          <div className="twf-tools">
+            <button
+              type="button"
+              className="twf-tool"
+              onClick={() => goTo(step - 1)}
+              disabled={isFirst}
+              aria-label="Paso anterior"
+              title="Paso anterior"
+            >
+              <ChevronLeft size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="twf-tool is-primary"
+              onClick={() => goTo(step + 1)}
+              disabled={isLast}
+              aria-label="Paso siguiente"
+              title="Paso siguiente"
+            >
+              <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="twf-tool"
+              onClick={togglePlay}
+              aria-pressed={playing}
+              aria-label={playing ? "Pausar" : "Reproducir"}
+              title={playing ? "Pausar" : "Reproducir"}
+            >
+              {playing ? (
+                <Pause size={16} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Play size={16} strokeWidth={2} aria-hidden="true" />
+              )}
+            </button>
+            <button type="button" className="twf-tool" onClick={reset} aria-label="Reiniciar" title="Reiniciar">
+              <RotateCcw size={16} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="twf-steps" role="group" aria-label="Pasos">
+            {scenario.steps.map((s, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`twf-seg ${i === step ? "is-current" : i < step ? "is-done" : ""}`}
+                aria-label={`Ir al paso ${i + 1}: ${s.title}`}
+                aria-current={i === step ? "step" : undefined}
+                title={`${i + 1}. ${s.title}`}
+                onClick={() => goTo(i)}
+              />
+            ))}
+          </div>
+        </div>
+
         <svg
           className={`twf-svg is-${illustrated ? "ill" : mode}`}
           viewBox={`0 0 ${layout.W} ${layout.H}`}
           role="img"
-          aria-label={`${scenario.tab}. Paso ${step + 1} de ${total}: ${current.title}`}
+          aria-label={`${method.tab}, ${flowLabel}. Paso ${step + 1} de ${total}: ${current.title}`}
         >
           <defs>
-            {["blue", "violet", "amber", "green", "past", "future"].map((t) => (
+            {["blue", "violet", "amber", "green", "coral", "past", "future"].map((t) => (
               <marker
                 key={t}
                 id={`${uid}-m-${t}`}
                 className={`twf-m-${t}`}
                 viewBox="0 0 10 10"
-                refX="8.5"
+                refX="6"
                 refY="5"
                 markerWidth="7"
                 markerHeight="7"
@@ -951,7 +1406,7 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
           ))}
           {current.edges.map((e, i) => (
             <DiagramEdge
-              key={`c-${scenarioId}-${step}-${e.from}-${e.to}`}
+              key={`c-${runKey}-${step}-${e.from}-${e.to}`}
               edge={e}
               geom={geomFor(e)}
               state="current"
@@ -965,7 +1420,7 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
           {illustrated &&
             scenario.order.map((id) => (
               <IllustratedNode
-                key={`${scenarioId}-${id}`}
+                key={`${runKey}-${id}`}
                 def={scenario.nodes[id]}
                 pos={layout.pos[id]}
                 layout={layout}
@@ -977,7 +1432,7 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
             ))}
           {!illustrated && scenario.order.map((id) => (
             <DiagramNode
-              key={`${scenarioId}-${id}`}
+              key={`${runKey}-${id}`}
               def={scenario.nodes[id]}
               pos={layout.pos[id]}
               layout={layout}
@@ -991,15 +1446,16 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
         </svg>
 
         <ul className="twf-legend" aria-label="Leyenda de colores">
-          <li style={{ "--tone": "var(--twf-blue)" }}>Comunicación</li>
-          <li style={{ "--tone": "var(--twf-violet)" }}>Código TOTP</li>
-          <li style={{ "--tone": "var(--twf-amber)" }}>Desafío y criptografía</li>
-          <li style={{ "--tone": "var(--twf-green)" }}>Verificado</li>
+          {legend.map((l) => (
+            <li key={l.tone} style={{ "--tone": `var(--twf-${l.tone})` }}>
+              {l.label}
+            </li>
+          ))}
         </ul>
       </div>
 
       <div className="twf-panel" aria-live="polite">
-        <div className="twf-panel-main" key={`m-${scenarioId}-${step}`}>
+        <div className="twf-panel-main" key={`m-${runKey}-${step}`}>
           <span className="twf-eyebrow">
             Paso {step + 1} de {total}
           </span>
@@ -1013,18 +1469,28 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
           )}
         </div>
 
-        <div className="twf-panel-side" key={`s-${scenarioId}-${step}`}>
-          <div className="twf-detail">
-            <span className="twf-detail-label">{current.detail.label}</span>
-            <code className="twf-detail-value">{current.detail.value}</code>
-          </div>
+        <div className="twf-panel-side" key={`s-${runKey}-${step}`}>
+          {current.detail && (
+            <div className="twf-detail">
+              <span className="twf-detail-label">{current.detail.label}</span>
+              <code className="twf-detail-value">{current.detail.value}</code>
+            </div>
+          )}
 
-          {current.checks && (
+          {checks.length > 0 && (
             <ul className="twf-checks">
-              {current.checks.map((c, i) => (
-                <li key={c} style={{ animationDelay: `${0.15 + i * 0.18}s` }}>
-                  <CheckCircle2 size={16} strokeWidth={1.9} aria-hidden="true" />
-                  <span>{c}</span>
+              {checks.map((c, i) => (
+                <li
+                  key={c.text}
+                  className={c.ok ? undefined : "is-bad"}
+                  style={{ animationDelay: `${0.15 + i * 0.18}s` }}
+                >
+                  {c.ok ? (
+                    <CheckCircle2 size={16} strokeWidth={1.9} aria-hidden="true" />
+                  ) : (
+                    <CircleX size={16} strokeWidth={1.9} aria-hidden="true" />
+                  )}
+                  <span>{c.text}</span>
                 </li>
               ))}
             </ul>
@@ -1032,10 +1498,20 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
 
           {current.result && (
             <div className="twf-result-row">
-              <span className="twf-result">
-                <ShieldCheck size={17} strokeWidth={1.9} aria-hidden="true" />
+              <span className={`twf-result${badResult ? " is-bad" : ""}`}>
+                {badResult ? (
+                  <ShieldAlert size={17} strokeWidth={1.9} aria-hidden="true" />
+                ) : (
+                  <ShieldCheck size={17} strokeWidth={1.9} aria-hidden="true" />
+                )}
                 {current.result}
               </span>
+              {current.next && (
+                <button type="button" className="twf-btn is-next" onClick={() => jumpTo(current.next)}>
+                  <ArrowRight size={16} strokeWidth={1.9} aria-hidden="true" />
+                  {current.next.label}
+                </button>
+              )}
               <button
                 type="button"
                 className="twf-btn"
@@ -1050,49 +1526,6 @@ export default function TotpWebauthnFlow({ initialScenario = "totp", autoplayMs 
           )}
         </div>
       </div>
-      </div>
-
-      <div className="twf-controls">
-        <div className="twf-btns">
-          <button type="button" className="twf-btn" onClick={() => goTo(step - 1)} disabled={isFirst}>
-            <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-            Anterior
-          </button>
-          <button type="button" className="twf-btn is-primary" onClick={() => goTo(step + 1)} disabled={isLast}>
-            Siguiente
-            <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <button type="button" className="twf-btn" onClick={togglePlay} aria-pressed={playing}>
-            {playing ? (
-              <Pause size={16} strokeWidth={2} aria-hidden="true" />
-            ) : (
-              <Play size={16} strokeWidth={2} aria-hidden="true" />
-            )}
-            {playing ? "Pausar" : "Reproducir"}
-          </button>
-          <button type="button" className="twf-btn" onClick={reset}>
-            <RotateCcw size={16} strokeWidth={2} aria-hidden="true" />
-            Reiniciar
-          </button>
-        </div>
-
-        <div className="twf-progress" style={{ "--tone": `var(--twf-${scenario.tone})` }}>
-          <div className="twf-dots">
-            {scenario.steps.map((s, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`twf-dot ${i === step ? "is-current" : i < step ? "is-done" : ""}`}
-                aria-label={`Ir al paso ${i + 1}: ${s.title}`}
-                aria-current={i === step ? "step" : undefined}
-                onClick={() => goTo(i)}
-              />
-            ))}
-          </div>
-          <span>
-            Paso {step + 1} de {total}
-          </span>
-        </div>
       </div>
 
       {showCompare && (
