@@ -28,7 +28,9 @@ export const CATEGORIES: Record<CategoryId, CategoryMeta> = {
   mitos: { label: 'MITOS', hue: 55, textClass: 'text-[oklch(78%_0.15_55)]', bgClass: 'bg-[oklch(78%_0.15_55)]' },
 };
 
+const FILTER_IDS: CategoryId[] = ['auth', 'mitos'];
+
 export const CATEGORY_FILTERS = [
   { id: 'todos' as const, label: '--todos', hue: null },
-  ...CATEGORY_IDS.map((id) => ({ id, label: `--${id}`, hue: CATEGORIES[id].hue })),
+  ...FILTER_IDS.map((id) => ({ id, label: `--${id}`, hue: CATEGORIES[id].hue })),
 ];
